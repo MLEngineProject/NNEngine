@@ -1,0 +1,36 @@
+# --- Build Artifacts ---
+build/
+out/
+bin/
+obj/
+*.so
+*.a
+*.la
+*.o
+*.obj
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+.pytest_cache/
+
+# --- IDEs and Editors ---
+.vscode/
+.idea/
+*.swp
+*.swo
+.clangd/
+compile_commands.json
+
+# --- Data & Logs ---
+data/*.csv
+!data/README.md
+*.log
+
+# --- CMake ---
+CMakeUserPresets.json
+_deps/
