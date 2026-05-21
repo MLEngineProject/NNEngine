@@ -30,18 +30,11 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(pybind11)
 
-find_package(OpenMP REQUIRED)
-
-find_package(BLAS)
-find_package(LAPACK)
-
-if(BLAS_FOUND)
-    target_link_libraries(nn_core PRIVATE ${BLAS_LIBRARIES})
-    target_compile_definitions(nn_core PRIVATE EIGEN_USE_BLAS)
-endif()
+find_package(OpenMP)
 
 pybind11_add_module(nn_core NO_EXTRAS
     src/binding.cpp 
+    src/core/Model.cpp
     src/parametric/LogisticNeuron.cpp
     src/parametric/DenseLayer.cpp
     src/parametric/ReLULayer.cpp
@@ -52,7 +45,14 @@ target_include_directories(nn_core SYSTEM PRIVATE
     ${eigen_SOURCE_DIR}
 )
 
-target_link_libraries(nn_core PRIVATE pybind11::module OpenMP::OpenMP_CXX)
+target_link_libraries(nn_core PRIVATE pybind11::module)
+
+if(OpenMP_CXX_FOUND)
+    target_link_libraries(nn_core PRIVATE OpenMP::OpenMP_CXX)
+    message(STATUS "OpenMP found: Multi-threading enabled in NNEngine.")
+else()
+    message(WARNING "OpenMP NOT found: Falling back to single-threaded NNEngine.")
+endif()
 
 target_compile_definitions(nn_core PRIVATE EIGEN_USE_THREADS)
 

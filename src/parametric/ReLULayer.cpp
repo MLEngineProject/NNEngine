@@ -7,11 +7,10 @@ void ReLULayer::forward(const core::MatrixRM& input, core::MatrixRM& output) {
   output = input.cwiseMax(0.0);
 }
 
-core::MatrixRM ReLULayer::backward(const core::MatrixRM& output_gradient,
-                                   double /*learning_rate*/) {
+core::MatrixRM ReLULayer::backward(const core::MatrixRM& output_gradient) {
   core::MatrixRM dX = output_gradient;
   dX = (last_input_.array() > 0.0).select(dX, 0.0);
   return dX;
 }
 
-}  // namespace mlengine::parametric
+}

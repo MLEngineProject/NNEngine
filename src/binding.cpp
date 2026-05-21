@@ -5,6 +5,8 @@
 #include <memory>
 
 #include "core/Layer.hpp"
+#include "core/Loss.hpp"
+#include "core/Model.hpp"
 #include "parametric/DenseLayer.hpp"
 #include "parametric/LogisticNeuron.hpp"
 #include "parametric/ReLULayer.hpp"
@@ -17,7 +19,15 @@ using namespace mlengine::parametric;
 PYBIND11_MODULE(nn_core, m) {
   m.doc() = "C++ Parametric Optimization Layer Engine for NNEngine";
 
-  py::class_<Layer, std::shared_ptr<Layer>>(m, "Layer");
+  py::class_<Layer, std::shared_ptr<Layer>>(m, "Layer")
+      .def("update_weights", &Layer::update_weights);
+
+  py::class_<Loss, std::shared_ptr<Loss>>(m, "Loss");
+
+  py::class_<MSELoss, Loss, std::shared_ptr<MSELoss>>(m, "MSELoss")
+      .def(py::init<>())
+      .def("calculate", &MSELoss::calculate)
+      .def("backward", &MSELoss::backward);
 
   py::class_<LogisticNeuron>(m, "LogisticNeuron")
       .def(py::init<>())
@@ -37,6 +47,7 @@ PYBIND11_MODULE(nn_core, m) {
              return output;
            })
       .def("backward", &DenseLayer::backward)
+      .def("update_weights", &DenseLayer::update_weights)
       .def("get_weights", &DenseLayer::get_weights)
       .def("get_bias", &DenseLayer::get_bias);
 
@@ -48,7 +59,8 @@ PYBIND11_MODULE(nn_core, m) {
              self.forward(input, output);
              return output;
            })
-      .def("backward", &ReLULayer::backward);
+      .def("backward", &ReLULayer::backward)
+      .def("update_weights", &ReLULayer::update_weights);
 
   py::class_<Sequential, Layer, std::shared_ptr<Sequential>>(m, "Sequential")
       .def(py::init<>())
@@ -59,5 +71,15 @@ PYBIND11_MODULE(nn_core, m) {
              self.forward(input, output);
              return output;
            })
-      .def("backward", &Sequential::backward);
+      .def("backward", &Sequential::backward)
+      .def("update_weights", &Sequential::update_weights);
+
+  py::class_<Model, std::shared_ptr<Model>>(m, "Model")
+      .def(py::init<>())
+      .def("add", &Model::add, py::arg("layer"))
+      .def("compile", &Model::compile, py::arg("loss_fn"))
+      .def("fit", &Model::fit, py::arg("X"), py::arg("y"),
+           py::arg("epochs") = 100, py::arg("learning_rate") = 0.01,
+           py::arg("verbose") = true)
+      .def("predict", &Model::predict, py::arg("X"));
 }
