@@ -10,7 +10,11 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if(NOT MSVC)
-    add_compile_options(-O3 -march=native)
+    if(APPLE)
+        add_compile_options(-O3)
+    else()
+        add_compile_options(-O3 -march=native)
+    endif()
 endif()
 
 include(FetchContent)
