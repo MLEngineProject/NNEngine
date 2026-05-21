@@ -1,94 +1,76 @@
 import nn_core
 import numpy as np
 import time
-from sklearn.datasets import make_regression
+from sklearn.datasets import fetch_olivetti_faces, load_iris, load_digits
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
-from sklearn.neural_network import MLPRegressor
-from sklearn.metrics import mean_squared_error
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.neural_network import MLPClassifier
+from sklearn.metrics import accuracy_score
 
-def test_regression_performance():
-    print("\n--- Testing NNEngine: Non-Linear Regression ---")
+def test_dataset(name, X, y, epochs, lr, batch_size, hidden_size):
+    print(f"\n--- Testing {name} ---")
     
-    # 1. Generate Data
-    # 5000 samples, 20 features, making it slightly non-linear
-    X, y = make_regression(n_samples=5000, n_features=20, noise=0.1, random_state=42)
+    num_features = X.shape[1]
+    num_classes = len(np.unique(y))
     
-    # NNEngine strictly expects 2D matrices (MatrixRM) for both X and y.
-    # Scikit-learn generates y as (N,), so we must reshape it to (N, 1).
-    y = y.reshape(-1, 1)
+    encoder = OneHotEncoder(sparse_output=False)
+    y_onehot = encoder.fit_transform(y.reshape(-1, 1))
 
     X_train, X_test, y_train, y_test = train_test_split(
-        X.astype(np.float64), y.astype(np.float64), test_size=0.2, random_state=42
+        X.astype(np.float64), y_onehot, test_size=0.2, stratify=y, random_state=42
     )
 
-    # Neural Networks require scaled data to prevent exploding gradients
-    scaler_X = StandardScaler()
-    scaler_y = StandardScaler()
-    
-    X_train_scaled = scaler_X.fit_transform(X_train)
-    X_test_scaled = scaler_X.transform(X_test)
-    y_train_scaled = scaler_y.fit_transform(y_train)
-    y_test_scaled = scaler_y.transform(y_test)
+    scaler = StandardScaler()
+    X_train_scaled = scaler.fit_transform(X_train)
+    X_test_scaled = scaler.transform(X_test)
 
-    # Architecture Config
-    epochs = 200
-    lr = 0.01
-
-    # ==========================================
-    # Custom NNEngine (C++ Native)
-    # ==========================================
     model = nn_core.Model()
-    model.add(nn_core.DenseLayer(20, 64))
+    model.add(nn_core.DenseLayer(num_features, hidden_size))
     model.add(nn_core.ReLULayer())
-    model.add(nn_core.DenseLayer(64, 1))
-    model.compile(nn_core.MSELoss())
+    model.add(nn_core.DenseLayer(hidden_size, num_classes))
+    model.add(nn_core.SoftmaxLayer())
+    model.compile(nn_core.CategoricalCrossEntropyLoss())
 
-    print("Training NNEngine...")
     t0 = time.perf_counter()
-    # Verbose=False to avoid cluttering the benchmark output
-    model.fit(X_train_scaled, y_train_scaled, epochs=epochs, learning_rate=lr, verbose=False)
+    model.fit(X_train_scaled, y_train, epochs=epochs, learning_rate=lr, batch_size=batch_size, verbose=False)
+    
+    nn_pred_probs = model.predict(X_test_scaled)
+    nn_preds = np.argmax(nn_pred_probs, axis=1)
+    y_test_labels = np.argmax(y_test, axis=1) 
     t1 = time.perf_counter()
 
-    nn_preds = model.predict(X_test_scaled)
-    nn_mse = mean_squared_error(y_test_scaled, nn_preds)
     nn_time = t1 - t0
+    nn_acc = accuracy_score(y_test_labels, nn_preds) * 100
+    print(f"NNEngine   — Accuracy: {nn_acc:.2f}%  |  Time: {nn_time:.4f}s")
 
-    print(f"NNEngine   | MSE: {nn_mse:.6f} | Time: {nn_time:.4f}s")
-
-    # ==========================================
-    # Scikit-Learn (MLPRegressor)
-    # ==========================================
-    print("Training Scikit-Learn...")
-    # Configure sklearn to mirror our C++ Engine:
-    # solver='sgd' with momentum=0 mirrors our basic Vanilla Gradient Descent.
-    # batch_size=X_train.shape[0] forces Full-Batch GD instead of mini-batches.
-    sk_model = MLPRegressor(
-        hidden_layer_sizes=(64,), 
+    sk_model = MLPClassifier(
+        hidden_layer_sizes=(hidden_size,), 
         activation='relu', 
         solver='sgd',
-        batch_size=X_train.shape[0], 
+        batch_size=batch_size, 
         learning_rate_init=lr,
         max_iter=epochs,
         momentum=0.0,
         random_state=42
     )
-
+    
     t0 = time.perf_counter()
-    # sklearn expects y as (N,)
-    sk_model.fit(X_train_scaled, y_train_scaled.ravel())
+    y_train_flat = np.argmax(y_train, axis=1)
+    sk_model.fit(X_train_scaled, y_train_flat)
+    sk_preds = sk_model.predict(X_test_scaled)
     t1 = time.perf_counter()
 
-    sk_preds = sk_model.predict(X_test_scaled)
-    sk_mse = mean_squared_error(y_test_scaled.ravel(), sk_preds)
     sk_time = t1 - t0
-
-    print(f"Scikit-Learn | MSE: {sk_mse:.6f} | Time: {sk_time:.4f}s")
-    
-    if nn_time < sk_time:
-        print(f"Speedup: {sk_time / nn_time:.2f}x faster than Sklearn!")
-    else:
-        print(f"Speedup: Sklearn is {nn_time / sk_time:.2f}x faster.")
+    sk_acc = accuracy_score(y_test_labels, sk_preds) * 100
+    print(f"Sklearn    — Accuracy: {sk_acc:.2f}%  |  Time: {sk_time:.4f}s")
+    print(f"Speedup: {sk_time / nn_time:.2f}x")
 
 if __name__ == "__main__":
-    test_regression_performance()
+    iris = load_iris()
+    test_dataset("Iris Flower", iris.data, iris.target, epochs=300, lr=0.05, batch_size=16, hidden_size=16)
+    
+    digits = load_digits()
+    test_dataset("Handwritten Digits", digits.data, digits.target, epochs=150, lr=0.05, batch_size=32, hidden_size=128)
+    
+    faces = fetch_olivetti_faces()
+    test_dataset("Olivetti Faces", faces.data, faces.target, epochs=100, lr=0.01, batch_size=32, hidden_size=128)

@@ -16,7 +16,7 @@ class Model {
   void compile(std::shared_ptr<Loss> loss_fn);
 
   void fit(const MatrixRM& X, const MatrixRM& y, int epochs,
-           double learning_rate, bool verbose = true);
+           double learning_rate, int batch_size = 32, bool verbose = true);
 
   MatrixRM predict(const MatrixRM& X);
 
@@ -25,4 +25,4 @@ class Model {
   std::shared_ptr<Loss> loss_fn_;
 };
 
-}
+}  // namespace mlengine::core
