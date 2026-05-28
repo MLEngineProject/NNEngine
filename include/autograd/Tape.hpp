@@ -8,11 +8,8 @@
 
 namespace mlengine::autograd {
 
-// 1. Flat Enum instead of Polymorphism
-enum class OpType { MatMul, AddBias, ReLU, LeakyReLU, Softmax };
+enum class OpType { MatMul, AddBias, ReLU, LeakyReLU };
 
-// 2. POD Struct (Plain Old Data) - Zero Virtual Functions, Zero Heap
-// Allocations
 struct OpNode {
   OpType type;
   Tensor *a, *b, *out;
@@ -41,8 +38,6 @@ struct OpNode {
               (a->data.array() > 0.0f)
                   .select(out->grad.array(), alpha * out->grad.array());
         break;
-      case OpType::Softmax:
-        break;
     }
   }
 };
@@ -50,20 +45,19 @@ struct OpNode {
 class Tape {
   std::deque<Tensor> tensor_pool_;
   size_t tensor_idx_ = 0;
-
-  // 3. 100% Contiguous Memory Array
   std::vector<OpNode> ops_;
   bool record_ops_;
 
  public:
   explicit Tape(bool record_ops = true) : record_ops_(record_ops) {
-    ops_.reserve(10000);  // Pre-allocate all graph memory at initialization
+    ops_.reserve(10000);
   }
 
   Tensor* alloc_tensor(int rows, int cols, bool requires_grad = true) {
     bool req_grad_actual = record_ops_ && requires_grad;
     if (tensor_idx_ >= tensor_pool_.size()) {
-      tensor_pool_.emplace_back(MatrixRM(rows, cols), req_grad_actual);
+      tensor_pool_.emplace_back(mlengine::MatrixRM(rows, cols),
+                                req_grad_actual);
     } else {
       if (tensor_pool_[tensor_idx_].data.rows() != rows ||
           tensor_pool_[tensor_idx_].data.cols() != cols) {
@@ -89,11 +83,11 @@ class Tape {
     return t;
   }
 
-  Tensor* push_tensor(const MatrixRM& data, bool requires_grad = true) {
+  Tensor* push_tensor(const mlengine::MatrixRM& data,
+                      bool requires_grad = true) {
     return push_expr(data, requires_grad);
   }
 
-  // 4. Graph construction now just pushes a struct to the vector
   Tensor* matmul(Tensor* a, Tensor* b) {
     bool req_grad = record_ops_ && (a->requires_grad || b->requires_grad);
     Tensor* out = alloc_tensor(a->data.rows(), b->data.cols(), req_grad);
@@ -124,17 +118,6 @@ class Tape {
     out->data.noalias() = a->data.unaryExpr(
         [alpha](float x) { return x > 0.0f ? x : alpha * x; });
     if (req_grad) ops_.push_back({OpType::LeakyReLU, a, nullptr, out, alpha});
-    return out;
-  }
-
-  Tensor* softmax(Tensor* a) {
-    bool req_grad = record_ops_ && a->requires_grad;
-    Tensor* out = alloc_tensor(a->data.rows(), a->data.cols(), req_grad);
-    Eigen::VectorXf max_vals = a->data.rowwise().maxCoeff();
-    MatrixRM exp_data = (a->data.colwise() - max_vals).array().exp();
-    Eigen::VectorXf sums = exp_data.rowwise().sum();
-    out->data.array() = exp_data.array().colwise() / sums.array();
-    if (req_grad) ops_.push_back({OpType::Softmax, a, nullptr, out, 0.0f});
     return out;
   }
 

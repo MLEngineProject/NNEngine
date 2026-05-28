@@ -1,7 +1,7 @@
 #pragma once
 #include "core/Layer.hpp"
 
-namespace mlengine::parametric {
+namespace mlengine::layers {
 
 class LeakyReLULayer : public core::Layer {
  public:
@@ -16,4 +16,4 @@ class LeakyReLULayer : public core::Layer {
   float alpha_;
 };
 
-}  // namespace mlengine::parametric
+}  // namespace mlengine::layers

@@ -1,12 +1,14 @@
 #pragma once
+
 #include <Eigen/Core>
 #include <vector>
 
 #include "autograd/Tape.hpp"
+#include "core/Types.hpp"
 
 namespace mlengine::core {
 
-using MatrixRM = autograd::MatrixRM;
+using MatrixRM = mlengine::MatrixRM;
 
 class Layer {
  public:

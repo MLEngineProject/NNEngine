@@ -1,22 +1,21 @@
 #pragma once
+
 #include <vector>
 
 #include "autograd/Tensor.hpp"
+#include "core/Types.hpp"
+#include "core/regularizer/Regularizer.hpp"
 
 namespace mlengine::core {
 
-class Regularizer {
- public:
-  virtual ~Regularizer() = default;
-
-  virtual float apply(const std::vector<autograd::Tensor*>& parameters) = 0;
-};
-
+/**
+ * @brief L2 regularizer that adds weight decay and penalty.
+ */
 class L2Regularizer : public Regularizer {
   float l2_;
 
  public:
-  L2Regularizer(float l2 = 0.0001f) : l2_(l2) {}
+  explicit L2Regularizer(float l2 = 0.0001f) : l2_(l2) {}
 
   float apply(const std::vector<autograd::Tensor*>& parameters) override {
     float penalty = 0.0f;

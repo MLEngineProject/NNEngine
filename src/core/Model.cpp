@@ -10,10 +10,14 @@
 
 #include "autograd/Tape.hpp"
 #include "core/Random.hpp"
+#include "core/loss/Loss.hpp"
+#include "core/optimizer/Optimizer.hpp"
+#include "core/regularizer/Regularizer.hpp"
+#include "layers/Sequential.hpp"
 
 namespace mlengine::core {
 
-Model::Model() { network_ = std::make_shared<parametric::Sequential>(); }
+Model::Model() { network_ = std::make_shared<layers::Sequential>(); }
 
 void Model::add(std::shared_ptr<Layer> layer) {
   network_->add(layer);

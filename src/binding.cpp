@@ -5,59 +5,55 @@
 #include <memory>
 
 #include "core/Layer.hpp"
-#include "core/Loss.hpp"
 #include "core/Model.hpp"
-#include "core/Optimizer.hpp"
 #include "core/Random.hpp"
-#include "core/Regularizer.hpp"
-#include "parametric/DenseLayer.hpp"
-#include "parametric/LeakyReLULayer.hpp"
-#include "parametric/ReLULayer.hpp"
-#include "parametric/Sequential.hpp"
-#include "parametric/SoftmaxLayer.hpp"
+#include "core/loss/Loss.hpp"
+#include "core/loss/MSELoss.hpp"
+#include "core/loss/SoftmaxCrossEntropyLoss.hpp"
+#include "core/optimizer/Adam.hpp"
+#include "core/optimizer/Optimizer.hpp"
+#include "core/optimizer/SGD.hpp"
+#include "core/regularizer/L2Regularizer.hpp"
+#include "core/regularizer/Regularizer.hpp"
+#include "layers/DenseLayer.hpp"
+#include "layers/LeakyReLULayer.hpp"
+#include "layers/ReLULayer.hpp"
+#include "layers/Sequential.hpp"
 
 namespace py = pybind11;
 using namespace mlengine::core;
-using namespace mlengine::parametric;
+using namespace mlengine::layers;
 
-PYBIND11_MODULE(nn_core, m) {
-  m.doc() = "C++ Parametric Optimization Layer Engine for NNEngine";
-
-  // Base Classes
-  py::class_<Layer, std::shared_ptr<Layer>>(m, "Layer");
-  py::class_<Loss, std::shared_ptr<Loss>>(m, "Loss");
-  py::class_<Optimizer, std::shared_ptr<Optimizer>>(m, "Optimizer");
-  py::class_<Regularizer, std::shared_ptr<Regularizer>>(m, "Regularizer");
-
+void bind_core_utils(py::module_& m) {
   m.def("set_seed", &set_seed, py::arg("seed"),
         "Seed NNEngine's shared random number generator.");
+  py::class_<Layer, std::shared_ptr<Layer>>(m, "Layer");
+}
 
-  // Losses
+void bind_losses_and_regs(py::module_& m) {
+  py::class_<Loss, std::shared_ptr<Loss>>(m, "Loss");
   py::class_<MSELoss, Loss, std::shared_ptr<MSELoss>>(m, "MSELoss")
       .def(py::init<>());
-  py::class_<CategoricalCrossEntropyLoss, Loss,
-             std::shared_ptr<CategoricalCrossEntropyLoss>>(
-      m, "CategoricalCrossEntropyLoss")
-      .def(py::init<>());
-
   py::class_<SoftmaxCrossEntropyLoss, Loss,
              std::shared_ptr<SoftmaxCrossEntropyLoss>>(
       m, "SoftmaxCrossEntropyLoss")
       .def(py::init<>());
 
-  // Regularizers
+  py::class_<Regularizer, std::shared_ptr<Regularizer>>(m, "Regularizer");
   py::class_<L2Regularizer, Regularizer, std::shared_ptr<L2Regularizer>>(
       m, "L2Regularizer")
       .def(py::init<float>(), py::arg("l2") = 0.0001f);
+}
 
-  // Optimizers
+void bind_optimizers(py::module_& m) {
+  py::class_<Optimizer, std::shared_ptr<Optimizer>>(m, "Optimizer");
   py::class_<SGD, Optimizer, std::shared_ptr<SGD>>(m, "SGD").def(
       py::init<float>(), py::arg("learning_rate") = 0.01f);
-
   py::class_<Adam, Optimizer, std::shared_ptr<Adam>>(m, "Adam").def(
       py::init<float>(), py::arg("learning_rate") = 0.001f);
+}
 
-  // Layers
+void bind_layers(py::module_& m) {
   py::class_<DenseLayer, Layer, std::shared_ptr<DenseLayer>>(m, "DenseLayer")
       .def(py::init<int, int>())
       .def("get_weights", &DenseLayer::get_weights)
@@ -65,20 +61,16 @@ PYBIND11_MODULE(nn_core, m) {
 
   py::class_<ReLULayer, Layer, std::shared_ptr<ReLULayer>>(m, "ReLULayer")
       .def(py::init<>());
-
   py::class_<LeakyReLULayer, Layer, std::shared_ptr<LeakyReLULayer>>(
       m, "LeakyReLULayer")
       .def(py::init<float>(), py::arg("alpha") = 0.01f);
 
-  py::class_<SoftmaxLayer, Layer, std::shared_ptr<SoftmaxLayer>>(m,
-                                                                 "SoftmaxLayer")
-      .def(py::init<>());
-
   py::class_<Sequential, Layer, std::shared_ptr<Sequential>>(m, "Sequential")
       .def(py::init<>())
       .def("add", &Sequential::add, py::arg("layer"));
+}
 
-  // Model
+void bind_model(py::module_& m) {
   py::class_<Model, std::shared_ptr<Model>>(m, "Model")
       .def(py::init<>())
       .def("add", &Model::add, py::arg("layer"))
@@ -90,4 +82,13 @@ PYBIND11_MODULE(nn_core, m) {
            py::call_guard<py::gil_scoped_release>())
       .def("predict", &Model::predict, py::arg("X"),
            py::call_guard<py::gil_scoped_release>());
+}
+
+PYBIND11_MODULE(nn_core, m) {
+  m.doc() = "C++ Core Engine for NNEngine";
+  bind_core_utils(m);
+  bind_losses_and_regs(m);
+  bind_optimizers(m);
+  bind_layers(m);
+  bind_model(m);
 }

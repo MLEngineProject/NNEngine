@@ -1,46 +1,17 @@
 #pragma once
+
 #include <cmath>
 #include <vector>
 
 #include "autograd/Tensor.hpp"
+#include "core/Types.hpp"
+#include "core/optimizer/Optimizer.hpp"
 
 namespace mlengine::core {
 
-class Optimizer {
- protected:
-  std::vector<autograd::Tensor*> parameters_;
-  float lr_;
-
- public:
-  Optimizer(float learning_rate) : lr_(learning_rate) {}
-  virtual ~Optimizer() = default;
-
-  virtual void set_parameters(const std::vector<autograd::Tensor*>& params) {
-    parameters_ = params;
-  }
-
-  virtual void step() = 0;
-
-  void zero_grad() {
-    for (auto* p : parameters_) {
-      p->zero_grad();
-    }
-  }
-};
-
-class SGD : public Optimizer {
- public:
-  SGD(float learning_rate = 0.01f) : Optimizer(learning_rate) {}
-
-  void step() override {
-    for (auto* p : parameters_) {
-      if (p->requires_grad) {
-        p->data -= lr_ * p->grad;
-      }
-    }
-  }
-};
-
+/**
+ * @brief Adam optimizer with bias correction.
+ */
 class Adam : public Optimizer {
   std::vector<autograd::MatrixRM> m_;
   std::vector<autograd::MatrixRM> v_;
@@ -50,7 +21,7 @@ class Adam : public Optimizer {
   float epsilon_ = 1e-8f;
 
  public:
-  Adam(float learning_rate = 0.001f) : Optimizer(learning_rate) {}
+  explicit Adam(float learning_rate = 0.001f) : Optimizer(learning_rate) {}
 
   void set_parameters(const std::vector<autograd::Tensor*>& params) override {
     Optimizer::set_parameters(params);

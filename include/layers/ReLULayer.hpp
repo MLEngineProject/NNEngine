@@ -1,7 +1,7 @@
 #pragma once
 #include "core/Layer.hpp"
 
-namespace mlengine::parametric {
+namespace mlengine::layers {
 
 class ReLULayer : public core::Layer {
  public:
@@ -11,4 +11,4 @@ class ReLULayer : public core::Layer {
   }
 };
 
-}  // namespace mlengine::parametric
+}  // namespace mlengine::layers

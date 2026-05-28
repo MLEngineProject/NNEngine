@@ -1,10 +1,11 @@
 #pragma once
 #include <Eigen/Core>
 
+#include "core/Types.hpp"
+
 namespace mlengine::autograd {
 
-using MatrixRM =
-    Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+using MatrixRM = mlengine::MatrixRM;
 
 struct Tensor {
   MatrixRM data;

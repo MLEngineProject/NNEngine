@@ -25,44 +25,49 @@ find_package(OpenMP)
 
 FetchContent_Declare(
     eigen
-    URL https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.tar.gz
+    URL "https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.tar.gz"
+    SOURCE_SUBDIR ""
 )
-FetchContent_GetProperties(eigen)
-if(NOT eigen_POPULATED)
-    FetchContent_Populate(eigen)
-endif()
+FetchContent_MakeAvailable(eigen)
 
 FetchContent_Declare(
     pybind11
-    URL https://github.com/pybind/pybind11/archive/refs/tags/v2.13.1.tar.gz
+    URL "https://github.com/pybind/pybind11/archive/refs/tags/v2.13.1.tar.gz"
 )
 FetchContent_MakeAvailable(pybind11)
 
-set(NOFORTRAN 1 CACHE BOOL "Build without Fortran" FORCE)
-set(USE_OPENMP 1 CACHE BOOL "Use OpenMP in OpenBLAS" FORCE)
-set(BUILD_WITHOUT_LAPACK 1 CACHE BOOL "We only need BLAS for Eigen" FORCE)
-set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build static OpenBLAS" FORCE)
-set(BUILD_TESTING OFF CACHE BOOL "Disable OpenBLAS tests" FORCE)
+if(MSVC)
+    message(WARNING "MSVC detected: Skipping OpenBLAS fetch. Falling back to Eigen internal math for Windows compatibility.")
+else()
+    set(NOFORTRAN 1 CACHE BOOL "Build without Fortran" FORCE)
+    set(USE_OPENMP 1 CACHE BOOL "Use OpenMP in OpenBLAS" FORCE)
+    set(BUILD_WITHOUT_LAPACK 1 CACHE BOOL "We only need BLAS for Eigen" FORCE)
+    set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build static OpenBLAS" FORCE)
+    set(BUILD_TESTING OFF CACHE BOOL "Disable OpenBLAS tests" FORCE)
 
-message(STATUS "Fetching and configuring OpenBLAS from source...")
-FetchContent_Declare(
-    OpenBLAS
-    URL https://github.com/OpenMathLib/OpenBLAS/releases/download/v0.3.26/OpenBLAS-0.3.26.tar.gz
-)
-FetchContent_GetProperties(OpenBLAS)
-if(NOT openblas_POPULATED)
-    FetchContent_Populate(OpenBLAS)
-    add_subdirectory(${openblas_SOURCE_DIR} ${openblas_BINARY_DIR} EXCLUDE_FROM_ALL)
+    message(STATUS "Fetching and configuring OpenBLAS from source...")
+    FetchContent_Declare(
+        OpenBLAS
+        URL "https://github.com/OpenMathLib/OpenBLAS/releases/download/v0.3.26/OpenBLAS-0.3.26.tar.gz"
+        EXCLUDE_FROM_ALL
+    )
+    FetchContent_MakeAvailable(OpenBLAS)
 endif()
 
 pybind11_add_module(nn_core NO_EXTRAS
     src/binding.cpp 
     src/core/Model.cpp
-    src/parametric/DenseLayer.cpp
+    src/layers/DenseLayer.cpp
 )
 
 target_include_directories(nn_core SYSTEM PRIVATE include ${eigen_SOURCE_DIR})
-target_link_libraries(nn_core PRIVATE pybind11::module openblas)
+
+if(NOT MSVC)
+    target_link_libraries(nn_core PRIVATE pybind11::module openblas)
+    target_compile_definitions(nn_core PRIVATE EIGEN_USE_BLAS)
+else()
+    target_link_libraries(nn_core PRIVATE pybind11::module)
+endif()
 
 if(OpenMP_CXX_FOUND)
     target_link_libraries(nn_core PRIVATE OpenMP::OpenMP_CXX)
@@ -71,5 +76,4 @@ else()
     message(WARNING "OpenMP NOT found: Falling back to single-threaded NNEngine.")
 endif()
 
-target_compile_definitions(nn_core PRIVATE EIGEN_USE_BLAS)
 install(TARGETS nn_core DESTINATION .)

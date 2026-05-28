@@ -4,7 +4,7 @@
 #include "autograd/Tensor.hpp"
 #include "core/Layer.hpp"
 
-namespace mlengine::parametric {
+namespace mlengine::layers {
 
 class DenseLayer : public core::Layer {
  public:
@@ -23,4 +23,4 @@ class DenseLayer : public core::Layer {
   autograd::Tensor bias_;
 };
 
-}  // namespace mlengine::parametric
+}  // namespace mlengine::layers

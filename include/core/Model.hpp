@@ -1,16 +1,35 @@
 #pragma once
-#include <Eigen/Core>
+
 #include <memory>
 #include <vector>
 
-#include "core/Layer.hpp"
-#include "core/Loss.hpp"
-#include "core/Optimizer.hpp"
-#include "core/Regularizer.hpp"
-#include "parametric/Sequential.hpp"
+#include "core/Types.hpp"
+
+namespace mlengine::autograd {
+struct Tensor;
+}  // namespace mlengine::autograd
 
 namespace mlengine::core {
 
+using MatrixRM = mlengine::MatrixRM;
+
+class Layer;
+class Loss;
+class Optimizer;
+class Regularizer;
+
+}  // namespace mlengine::core
+
+namespace mlengine::layers {
+class Sequential;
+}  // namespace mlengine::layers
+
+namespace mlengine::core {
+
+/**
+ * @brief High-level model wrapper that coordinates layers, losses, optimizers,
+ * and regularizers.
+ */
 class Model {
  public:
   Model();
@@ -28,7 +47,7 @@ class Model {
   MatrixRM predict(Eigen::Ref<const MatrixRM> X);
 
  private:
-  std::shared_ptr<parametric::Sequential> network_;
+  std::shared_ptr<layers::Sequential> network_;
   std::shared_ptr<Optimizer> optimizer_;
   std::shared_ptr<Loss> loss_fn_;
   std::shared_ptr<Regularizer> regularizer_;

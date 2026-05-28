@@ -4,7 +4,7 @@
 
 #include "core/Layer.hpp"
 
-namespace mlengine::parametric {
+namespace mlengine::layers {
 
 class Sequential : public core::Layer {
  public:
@@ -33,4 +33,4 @@ class Sequential : public core::Layer {
   std::vector<std::shared_ptr<core::Layer>> layers_;
 };
 
-}  // namespace mlengine::parametric
+}  // namespace mlengine::layers
