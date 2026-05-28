@@ -12,10 +12,10 @@ Designed for rapid experimentation without the Python Global Interpreter Lock (G
 ## Highlights
 
 - **Native Loop Hoisting**: The `Model::fit` loop executes entirely in C++, eliminating the Python GIL overhead across epochs and batches.
+- **Wengert List Autograd (Gradient Tape)**: Features a custom, zero-overhead automatic differentiation engine. Uses arena allocation and C++ move semantics (`std::move`) to dynamically build computational graphs without memory fragmentation or deep-copy bottlenecks.
 - **Memory-Optimized Backpropagation**: Utilizes Eigen's `.noalias()` to perform in-place matrix calculus without allocating temporary memory buffers.
 - **Mathematically Stable**: Built-in Xavier (Glorot) initialization and batch-normalized gradients to prevent exploding gradients.
-- **Cross-Platform Threading**: Graceful degradation OpenMP support. Uses multi-threading where available, gracefully falling back to single-threaded standard C++ on restricted environments (e.g., Apple Clang without `libomp`).
-- **Clean Python API**: A familiar Keras/scikit-learn style interface.
+- **Cross-Platform Threading**: Graceful degradation OpenMP support.
 
 ## Repository Structure
 
@@ -110,13 +110,13 @@ The orchestrator for the neural network.
 
 ## Benchmark Results
 
-Testing custom `NNEngine (C++)` vs `sklearn.neural_network.MLPClassifier` using Mini-Batch Gradient Descent. Benchmarks demonstrate the extreme performance advantage of native C++ loop hoisting, with `NNEngine` consistently achieving higher accuracy in significantly less time.
+Testing custom `NNEngine (C++)` vs `sklearn.neural_network.MLPClassifier` using Mini-Batch Gradient Descent. 
 
 | Dataset | Samples | Features | Classes | NNEngine Acc. | Sklearn Acc. | NNEngine Time | Speedup |
 |---|--:|--:|--:|--:|--:|--:|--:|
-| **Iris Flower** | 150 | 4 | 3 | **96.67%** | 96.67% | **0.014s** | **31.81×** |
-| **Digits** | 1,797 | 64 | 10 | **98.33%** | 97.78% | **0.995s** | **1.93×** |
-| **Olivetti Faces** | 400 | 4,096 | 40 | **93.75%** | 92.50% | **7.761s** | **2.34×** |
+| **Iris Flower** | 150 | 4 | 3 | **96.67%** | 96.67% | **0.011s** | **~28x** |
+| **Digits** | 1,797 | 64 | 10 | **98.33%** | 97.78% | **0.568s** | **~2.8x** |
+| **Olivetti Faces** | 400 | 4,096 | 40 | **93.75%** | 92.50% | **3.573s** | **~2.9x** |
 
 ## Notes and Limitations
 

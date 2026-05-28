@@ -6,6 +6,8 @@
 #include <random>
 #include <stdexcept>
 
+#include "autograd/Tape.hpp"
+
 namespace mlengine::core {
 
 Model::Model() { network_ = std::make_shared<parametric::Sequential>(); }
@@ -28,6 +30,8 @@ void Model::fit(const MatrixRM& X, const MatrixRM& y, int epochs,
 
   std::mt19937 rng(42);
 
+  autograd::Tape tape;
+
   for (int epoch = 0; epoch < epochs; ++epoch) {
     std::shuffle(indices.begin(), indices.end(), rng);
 
@@ -45,15 +49,19 @@ void Model::fit(const MatrixRM& X, const MatrixRM& y, int epochs,
         batch_y.row(i) = y.row(indices[start_idx + i]);
       }
 
-      MatrixRM predictions;
-      network_->forward(batch_X, predictions);
+      autograd::Tensor* X_tensor = tape.push_tensor(batch_X, false);
+      autograd::Tensor* y_tensor = tape.push_tensor(batch_y, false);
 
-      epoch_loss += loss_fn_->calculate(predictions, batch_y);
+      autograd::Tensor* predictions = network_->forward(tape, X_tensor);
+
+      epoch_loss += loss_fn_->forward(predictions, y_tensor);
       num_batches++;
 
-      MatrixRM loss_gradient = loss_fn_->backward(predictions, batch_y);
-      network_->backward(loss_gradient);
+      tape.backward();
+
       network_->update_weights(learning_rate);
+
+      tape.reset();
     }
 
     double avg_epoch_loss = epoch_loss / num_batches;
@@ -66,9 +74,12 @@ void Model::fit(const MatrixRM& X, const MatrixRM& y, int epochs,
 }
 
 MatrixRM Model::predict(const MatrixRM& X) {
-  MatrixRM predictions;
-  network_->forward(X, predictions);
-  return predictions;
+  autograd::Tape tape(false);
+
+  autograd::Tensor* X_tensor = tape.push_tensor(X, false);
+  autograd::Tensor* predictions = network_->forward(tape, X_tensor);
+
+  return predictions->data;
 }
 
 }  // namespace mlengine::core

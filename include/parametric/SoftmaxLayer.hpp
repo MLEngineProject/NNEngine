@@ -5,11 +5,10 @@ namespace mlengine::parametric {
 
 class SoftmaxLayer : public core::Layer {
  public:
-  void forward(const core::MatrixRM& input, core::MatrixRM& output) override;
-  core::MatrixRM backward(const core::MatrixRM& output_gradient) override;
-
- private:
-  core::MatrixRM P_;
+  autograd::Tensor* forward(autograd::Tape& tape,
+                            autograd::Tensor* input) override {
+    return tape.softmax(input);
+  }
 };
 
-}
+}  // namespace mlengine::parametric

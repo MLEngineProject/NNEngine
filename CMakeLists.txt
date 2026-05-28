@@ -39,10 +39,7 @@ find_package(OpenMP)
 pybind11_add_module(nn_core NO_EXTRAS
     src/binding.cpp 
     src/core/Model.cpp
-    src/parametric/LogisticNeuron.cpp
     src/parametric/DenseLayer.cpp
-    src/parametric/ReLULayer.cpp
-    src/parametric/SoftmaxLayer.cpp
 )
 
 target_include_directories(nn_core SYSTEM PRIVATE 
