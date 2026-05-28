@@ -45,6 +45,11 @@ else()
     set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build static OpenBLAS" FORCE)
     set(BUILD_TESTING OFF CACHE BOOL "Disable OpenBLAS tests" FORCE)
 
+    if(APPLE AND (CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64" OR CMAKE_OSX_ARCHITECTURES MATCHES "arm64|aarch64"))
+        set(TARGET "VORTEX" CACHE STRING "OpenBLAS Apple Silicon Target" FORCE)
+        message(STATUS "Apple Silicon detected: Forcing OpenBLAS target to VORTEX")
+    endif()
+
     message(STATUS "Fetching and configuring OpenBLAS from source...")
     FetchContent_Declare(
         OpenBLAS
