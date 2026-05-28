@@ -65,6 +65,11 @@ class Adam : public Optimizer {
 
   void step() override {
     t_++;
+    double current_lr = lr_ * std::pow(0.999, t_ / 100.0);
+
+    double bias_corr1 = 1.0 - std::pow(beta1_, static_cast<double>(t_));
+    double bias_corr2 = 1.0 - std::pow(beta2_, static_cast<double>(t_));
+
     for (size_t i = 0; i < parameters_.size(); ++i) {
       auto* p = parameters_[i];
       if (!p->requires_grad) continue;
@@ -72,11 +77,9 @@ class Adam : public Optimizer {
       m_[i] = beta1_ * m_[i] + (1.0 - beta1_) * p->grad;
       v_[i] = beta2_ * v_[i] + (1.0 - beta2_) * p->grad.cwiseAbs2();
 
-      autograd::MatrixRM m_hat = m_[i] / (1.0 - std::pow(beta1_, t_));
-      autograd::MatrixRM v_hat = v_[i] / (1.0 - std::pow(beta2_, t_));
-
-      p->data -= lr_ * m_hat.cwiseQuotient(
-                           (v_hat.cwiseSqrt().array() + epsilon_).matrix());
+      p->data -= (current_lr * (m_[i].array() / bias_corr1) /
+                  ((v_[i].array() / bias_corr2).sqrt() + epsilon_))
+                     .matrix();
     }
   }
 };

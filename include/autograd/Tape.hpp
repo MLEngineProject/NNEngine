@@ -64,12 +64,12 @@ struct SoftmaxOp : public OpNode {
   SoftmaxOp(Tensor* a, Tensor* out) : a_(a), out_(out) {}
   void backward() override {
     if (a_->requires_grad) {
-      for (int i = 0; i < out_->grad.rows(); ++i) {
-        auto p_row = out_->data.row(i).array();
-        auto grad_row = out_->grad.row(i).array();
-        a_->grad.row(i).array() +=
-            p_row * grad_row - p_row * (p_row * grad_row).sum();
-      }
+      Eigen::MatrixXd dot_prod =
+          (out_->data.array() * out_->grad.array()).rowwise().sum();
+      a_->grad.noalias() += (out_->data.array() *
+                             (out_->grad.array() -
+                              dot_prod.replicate(1, out_->grad.cols()).array()))
+                                .matrix();
     }
   }
 };

@@ -9,6 +9,7 @@ namespace mlengine::parametric {
 class DenseLayer : public core::Layer {
  public:
   DenseLayer(int input_dim, int output_dim);
+
   autograd::Tensor* forward(autograd::Tape& tape,
                             autograd::Tensor* input) override;
 

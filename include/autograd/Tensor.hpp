@@ -10,16 +10,19 @@ struct Tensor {
   MatrixRM data;
   MatrixRM grad;
   bool requires_grad;
+  bool apply_regularization;
 
-  Tensor(const MatrixRM& val, bool req_grad = true)
-      : data(val), requires_grad(req_grad) {
+  Tensor(const MatrixRM& val, bool req_grad = true, bool apply_reg = false)
+      : data(val), requires_grad(req_grad), apply_regularization(apply_reg) {
     if (requires_grad) {
       grad = MatrixRM::Zero(val.rows(), val.cols());
     }
   }
 
-  Tensor(MatrixRM&& val, bool req_grad = true)
-      : data(std::move(val)), requires_grad(req_grad) {
+  Tensor(MatrixRM&& val, bool req_grad = true, bool apply_reg = false)
+      : data(std::move(val)),
+        requires_grad(req_grad),
+        apply_regularization(apply_reg) {
     if (requires_grad) {
       grad = MatrixRM::Zero(data.rows(), data.cols());
     }
