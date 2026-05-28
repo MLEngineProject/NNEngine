@@ -36,7 +36,9 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(pybind11)
 
-if(MSVC)
+if(APPLE)
+    message(STATUS "Apple detected: Bypassing OpenBLAS and using native Accelerate framework.")
+elseif(MSVC)
     message(WARNING "MSVC detected: Skipping OpenBLAS fetch. Falling back to Eigen internal math for Windows compatibility.")
 else()
     set(NOFORTRAN 1 CACHE BOOL "Build without Fortran" FORCE)
@@ -44,11 +46,6 @@ else()
     set(BUILD_WITHOUT_LAPACK 1 CACHE BOOL "We only need BLAS for Eigen" FORCE)
     set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build static OpenBLAS" FORCE)
     set(BUILD_TESTING OFF CACHE BOOL "Disable OpenBLAS tests" FORCE)
-
-    if(APPLE AND (CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64" OR CMAKE_OSX_ARCHITECTURES MATCHES "arm64|aarch64"))
-        set(TARGET "VORTEX" CACHE STRING "OpenBLAS Apple Silicon Target" FORCE)
-        message(STATUS "Apple Silicon detected: Forcing OpenBLAS target to VORTEX")
-    endif()
 
     message(STATUS "Fetching and configuring OpenBLAS from source...")
     FetchContent_Declare(
@@ -67,7 +64,10 @@ pybind11_add_module(nn_core NO_EXTRAS
 
 target_include_directories(nn_core SYSTEM PRIVATE include ${eigen_SOURCE_DIR})
 
-if(NOT MSVC)
+if(APPLE)
+    target_link_libraries(nn_core PRIVATE pybind11::module "-framework Accelerate")
+    target_compile_definitions(nn_core PRIVATE EIGEN_USE_BLAS)
+elseif(NOT MSVC)
     target_link_libraries(nn_core PRIVATE pybind11::module openblas)
     target_compile_definitions(nn_core PRIVATE EIGEN_USE_BLAS)
 else()
