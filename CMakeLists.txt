@@ -71,6 +71,11 @@ endif()
 
 if(OpenMP_CXX_FOUND)
     target_link_libraries(nn_core PRIVATE OpenMP::OpenMP_CXX)
+    
+    if(MSVC)
+        target_compile_options(nn_core PRIVATE /openmp:experimental)
+    endif()
+    
     message(STATUS "OpenMP found: Multi-threading enabled in NNEngine.")
 else()
     message(WARNING "OpenMP NOT found: Falling back to single-threaded NNEngine.")
