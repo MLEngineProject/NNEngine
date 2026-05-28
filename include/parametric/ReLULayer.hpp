@@ -5,11 +5,10 @@ namespace mlengine::parametric {
 
 class ReLULayer : public core::Layer {
  public:
-  void forward(const core::MatrixRM& input, core::MatrixRM& output) override;
-  core::MatrixRM backward(const core::MatrixRM& output_gradient) override;
-
- private:
-  core::MatrixRM last_input_;
+  autograd::Tensor* forward(autograd::Tape& tape,
+                            autograd::Tensor* input) override {
+    return tape.relu(input);
+  }
 };
 
-}
+}  // namespace mlengine::parametric

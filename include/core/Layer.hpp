@@ -1,6 +1,7 @@
 #pragma once
 #include <Eigen/Core>
-#include <iostream>
+
+#include "autograd/Tape.hpp"
 
 namespace mlengine::core {
 
@@ -11,11 +12,9 @@ class Layer {
  public:
   virtual ~Layer() = default;
 
-  virtual void forward(const MatrixRM& input, MatrixRM& output) = 0;
-
-  virtual MatrixRM backward(const MatrixRM& output_gradient) = 0;
-
+  virtual autograd::Tensor* forward(autograd::Tape& tape,
+                                    autograd::Tensor* input) = 0;
   virtual void update_weights(double learning_rate) {}
 };
 
-}
+}  // namespace mlengine::core

@@ -8,7 +8,6 @@
 #include "core/Loss.hpp"
 #include "core/Model.hpp"
 #include "parametric/DenseLayer.hpp"
-#include "parametric/LogisticNeuron.hpp"
 #include "parametric/ReLULayer.hpp"
 #include "parametric/Sequential.hpp"
 #include "parametric/SoftmaxLayer.hpp"
@@ -20,79 +19,33 @@ using namespace mlengine::parametric;
 PYBIND11_MODULE(nn_core, m) {
   m.doc() = "C++ Parametric Optimization Layer Engine for NNEngine";
 
-  py::class_<Layer, std::shared_ptr<Layer>>(m, "Layer")
-      .def("update_weights", &Layer::update_weights);
+  py::class_<Layer, std::shared_ptr<Layer>>(m, "Layer");
 
   py::class_<Loss, std::shared_ptr<Loss>>(m, "Loss");
 
   py::class_<MSELoss, Loss, std::shared_ptr<MSELoss>>(m, "MSELoss")
-      .def(py::init<>())
-      .def("calculate", &MSELoss::calculate)
-      .def("backward", &MSELoss::backward);
+      .def(py::init<>());
 
   py::class_<CategoricalCrossEntropyLoss, Loss,
              std::shared_ptr<CategoricalCrossEntropyLoss>>(
       m, "CategoricalCrossEntropyLoss")
-      .def(py::init<>())
-      .def("calculate", &CategoricalCrossEntropyLoss::calculate)
-      .def("backward", &CategoricalCrossEntropyLoss::backward);
-
-  py::class_<LogisticNeuron>(m, "LogisticNeuron")
-      .def(py::init<>())
-      .def("fit", &LogisticNeuron::fit, py::arg("X"), py::arg("y"),
-           py::arg("epochs"), py::arg("learning_rate"))
-      .def("predict_proba", &LogisticNeuron::predict_proba)
-      .def("predict", &LogisticNeuron::predict)
-      .def("get_weights", &LogisticNeuron::get_weights)
-      .def("get_bias", &LogisticNeuron::get_bias);
+      .def(py::init<>());
 
   py::class_<DenseLayer, Layer, std::shared_ptr<DenseLayer>>(m, "DenseLayer")
       .def(py::init<int, int>())
-      .def("forward",
-           [](DenseLayer& self, const MatrixRM& input) {
-             MatrixRM output;
-             self.forward(input, output);
-             return output;
-           })
-      .def("backward", &DenseLayer::backward)
-      .def("update_weights", &DenseLayer::update_weights)
       .def("get_weights", &DenseLayer::get_weights)
       .def("get_bias", &DenseLayer::get_bias);
 
   py::class_<ReLULayer, Layer, std::shared_ptr<ReLULayer>>(m, "ReLULayer")
-      .def(py::init<>())
-      .def("forward",
-           [](ReLULayer& self, const MatrixRM& input) {
-             MatrixRM output;
-             self.forward(input, output);
-             return output;
-           })
-      .def("backward", &ReLULayer::backward)
-      .def("update_weights", &ReLULayer::update_weights);
+      .def(py::init<>());
 
   py::class_<SoftmaxLayer, Layer, std::shared_ptr<SoftmaxLayer>>(m,
                                                                  "SoftmaxLayer")
-      .def(py::init<>())
-      .def("forward",
-           [](SoftmaxLayer& self, const MatrixRM& input) {
-             MatrixRM output;
-             self.forward(input, output);
-             return output;
-           })
-      .def("backward", &SoftmaxLayer::backward)
-      .def("update_weights", &SoftmaxLayer::update_weights);
+      .def(py::init<>());
 
   py::class_<Sequential, Layer, std::shared_ptr<Sequential>>(m, "Sequential")
       .def(py::init<>())
-      .def("add", &Sequential::add, py::arg("layer"))
-      .def("forward",
-           [](Sequential& self, const MatrixRM& input) {
-             MatrixRM output;
-             self.forward(input, output);
-             return output;
-           })
-      .def("backward", &Sequential::backward)
-      .def("update_weights", &Sequential::update_weights);
+      .def("add", &Sequential::add, py::arg("layer"));
 
   py::class_<Model, std::shared_ptr<Model>>(m, "Model")
       .def(py::init<>())

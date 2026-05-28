@@ -4,27 +4,23 @@
 
 namespace mlengine::parametric {
 
-DenseLayer::DenseLayer(int input_dim, int output_dim) {
-  double limit = std::sqrt(6.0 / (input_dim + output_dim));
-  weights_ = core::MatrixRM::Random(input_dim, output_dim) * limit;
-  bias_ = core::MatrixRM::Zero(1, output_dim);
-}
+DenseLayer::DenseLayer(int input_dim, int output_dim)
+    : weights_(core::MatrixRM::Random(input_dim, output_dim) *
+                   std::sqrt(6.0 / (input_dim + output_dim)),
+               true),
+      bias_(core::MatrixRM::Zero(1, output_dim), true) {}
 
-void DenseLayer::forward(const core::MatrixRM& input, core::MatrixRM& output) {
-  last_input_ = input;
-  output.noalias() = (input * weights_).rowwise() + bias_.row(0);
-}
-
-core::MatrixRM DenseLayer::backward(const core::MatrixRM& output_gradient) {
-  dW_.noalias() = last_input_.transpose() * output_gradient;
-  db_ = output_gradient.colwise().sum();
-
-  return output_gradient * weights_.transpose();
+autograd::Tensor* DenseLayer::forward(autograd::Tape& tape,
+                                      autograd::Tensor* input) {
+  auto* mm = tape.matmul(input, &weights_);
+  return tape.add_bias(mm, &bias_);
 }
 
 void DenseLayer::update_weights(double learning_rate) {
-  weights_ -= learning_rate * dW_;
-  bias_ -= learning_rate * db_;
+  weights_.data -= learning_rate * weights_.grad;
+  bias_.data -= learning_rate * bias_.grad;
+  weights_.zero_grad();
+  bias_.zero_grad();
 }
 
 }  // namespace mlengine::parametric
