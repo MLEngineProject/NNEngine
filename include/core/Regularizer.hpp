@@ -9,22 +9,32 @@ class Regularizer {
  public:
   virtual ~Regularizer() = default;
 
-  virtual double apply(const std::vector<autograd::Tensor*>& parameters) = 0;
+  virtual float apply(const std::vector<autograd::Tensor*>& parameters) = 0;
 };
 
 class L2Regularizer : public Regularizer {
-  double l2_;
+  float l2_;
 
  public:
-  L2Regularizer(double l2 = 0.0001) : l2_(l2) {}
+  L2Regularizer(float l2 = 0.0001f) : l2_(l2) {}
 
-  double apply(const std::vector<autograd::Tensor*>& parameters) override {
-    double penalty = 0.0;
+  float apply(const std::vector<autograd::Tensor*>& parameters) override {
+    float penalty = 0.0f;
     for (auto* p : parameters) {
-      if (p->requires_grad && p->apply_regularization) {
-        penalty += 0.5 * l2_ * p->data.squaredNorm();
-        p->grad += l2_ * p->data;
+      if (!p->requires_grad) continue;
+
+      float* p_ptr = p->data.data();
+      float* g_ptr = p->grad.data();
+      size_t size = p->data.size();
+
+      float local_penalty = 0.0f;
+
+#pragma omp simd reduction(+ : local_penalty)
+      for (size_t j = 0; j < size; ++j) {
+        local_penalty += p_ptr[j] * p_ptr[j];
+        g_ptr[j] += l2_ * p_ptr[j];
       }
+      penalty += 0.5f * l2_ * local_penalty;
     }
     return penalty;
   }

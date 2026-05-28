@@ -6,30 +6,30 @@ namespace mlengine::core {
 class Loss {
  public:
   virtual ~Loss() = default;
-  virtual double forward(autograd::Tensor* predictions,
-                         autograd::Tensor* targets) = 0;
+  virtual float forward(autograd::Tensor* predictions,
+                        autograd::Tensor* targets) = 0;
 };
 
 class MSELoss : public Loss {
  public:
-  double forward(autograd::Tensor* predictions,
-                 autograd::Tensor* targets) override {
+  float forward(autograd::Tensor* predictions,
+                autograd::Tensor* targets) override {
     if (predictions->requires_grad) {
-      predictions->grad =
-          2.0 * (predictions->data - targets->data) / predictions->data.rows();
+      predictions->grad = 2.0f * (predictions->data - targets->data) /
+                          static_cast<float>(predictions->data.rows());
     }
     return (predictions->data - targets->data).squaredNorm() /
-           predictions->data.rows();
+           static_cast<float>(predictions->data.rows());
   }
 };
 
 class CategoricalCrossEntropyLoss : public Loss {
  public:
-  double forward(autograd::Tensor* predictions,
-                 autograd::Tensor* targets) override {
-    double epsilon = 1e-15;
+  float forward(autograd::Tensor* predictions,
+                autograd::Tensor* targets) override {
+    float epsilon = 1e-7f;
     autograd::MatrixRM clipped =
-        predictions->data.cwiseMax(epsilon).cwiseMin(1.0 - epsilon);
+        predictions->data.cwiseMax(epsilon).cwiseMin(1.0f - epsilon);
 
     if (predictions->requires_grad) {
       predictions->grad = (-(targets->data.array() / clipped.array()) /
@@ -38,7 +38,36 @@ class CategoricalCrossEntropyLoss : public Loss {
     }
 
     return -(targets->data.array() * clipped.array().log()).sum() /
-           predictions->data.rows();
+           static_cast<float>(predictions->data.rows());
+  }
+};
+
+class SoftmaxCrossEntropyLoss : public Loss {
+ public:
+  float forward(autograd::Tensor* logits, autograd::Tensor* targets) override {
+    int batch_size = logits->data.rows();
+
+    logits->grad.noalias() = logits->data;
+
+    Eigen::VectorXf max_vals = logits->grad.rowwise().maxCoeff();
+    logits->grad.array().colwise() -= max_vals.array();
+
+    Eigen::VectorXf sums = logits->grad.array().exp().rowwise().sum();
+
+    Eigen::VectorXf log_sums = sums.array().log();
+    float loss =
+        -(targets->data.array() * (logits->grad.colwise() - log_sums).array())
+             .sum() /
+        static_cast<float>(batch_size);
+
+    if (logits->requires_grad) {
+      logits->grad.array() =
+          logits->grad.array().exp().colwise() / sums.array();
+      logits->grad.array() -= targets->data.array();
+      logits->grad.array() /= static_cast<float>(batch_size);
+    }
+
+    return loss;
   }
 };
 

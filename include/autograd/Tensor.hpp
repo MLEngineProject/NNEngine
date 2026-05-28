@@ -4,7 +4,7 @@
 namespace mlengine::autograd {
 
 using MatrixRM =
-    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+    Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
 
 struct Tensor {
   MatrixRM data;

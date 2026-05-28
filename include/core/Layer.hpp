@@ -6,8 +6,7 @@
 
 namespace mlengine::core {
 
-using MatrixRM =
-    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+using MatrixRM = autograd::MatrixRM;
 
 class Layer {
  public:

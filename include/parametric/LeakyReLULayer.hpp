@@ -5,7 +5,7 @@ namespace mlengine::parametric {
 
 class LeakyReLULayer : public core::Layer {
  public:
-  LeakyReLULayer(double alpha = 0.01) : alpha_(alpha) {}
+  LeakyReLULayer(float alpha = 0.01f) : alpha_(alpha) {}
 
   autograd::Tensor* forward(autograd::Tape& tape,
                             autograd::Tensor* input) override {
@@ -13,7 +13,7 @@ class LeakyReLULayer : public core::Layer {
   }
 
  private:
-  double alpha_;
+  float alpha_;
 };
 
 }  // namespace mlengine::parametric

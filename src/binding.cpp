@@ -40,17 +40,22 @@ PYBIND11_MODULE(nn_core, m) {
       m, "CategoricalCrossEntropyLoss")
       .def(py::init<>());
 
+  py::class_<SoftmaxCrossEntropyLoss, Loss,
+             std::shared_ptr<SoftmaxCrossEntropyLoss>>(
+      m, "SoftmaxCrossEntropyLoss")
+      .def(py::init<>());
+
   // Regularizers
   py::class_<L2Regularizer, Regularizer, std::shared_ptr<L2Regularizer>>(
       m, "L2Regularizer")
-      .def(py::init<double>(), py::arg("l2") = 0.0001);
+      .def(py::init<float>(), py::arg("l2") = 0.0001f);
 
   // Optimizers
   py::class_<SGD, Optimizer, std::shared_ptr<SGD>>(m, "SGD").def(
-      py::init<double>(), py::arg("learning_rate") = 0.01);
+      py::init<float>(), py::arg("learning_rate") = 0.01f);
 
   py::class_<Adam, Optimizer, std::shared_ptr<Adam>>(m, "Adam").def(
-      py::init<double>(), py::arg("learning_rate") = 0.001);
+      py::init<float>(), py::arg("learning_rate") = 0.001f);
 
   // Layers
   py::class_<DenseLayer, Layer, std::shared_ptr<DenseLayer>>(m, "DenseLayer")
@@ -63,7 +68,7 @@ PYBIND11_MODULE(nn_core, m) {
 
   py::class_<LeakyReLULayer, Layer, std::shared_ptr<LeakyReLULayer>>(
       m, "LeakyReLULayer")
-      .def(py::init<double>(), py::arg("alpha") = 0.01);
+      .def(py::init<float>(), py::arg("alpha") = 0.01f);
 
   py::class_<SoftmaxLayer, Layer, std::shared_ptr<SoftmaxLayer>>(m,
                                                                  "SoftmaxLayer")
@@ -79,9 +84,10 @@ PYBIND11_MODULE(nn_core, m) {
       .def("add", &Model::add, py::arg("layer"))
       .def("compile", &Model::compile, py::arg("optimizer"), py::arg("loss_fn"),
            py::arg("regularizer") = nullptr)
-      .def("fit", &Model::fit, py::arg("X"), py::arg("y"),
-           py::arg("epochs") = 100, py::arg("batch_size") = 32,
-           py::arg("tol") = 1e-4, py::arg("n_iter_no_change") = 10,
-           py::arg("verbose") = true)
-      .def("predict", &Model::predict, py::arg("X"));
+      .def("fit", &Model::fit, py::arg("X"), py::arg("y"), py::arg("epochs"),
+           py::arg("batch_size") = 32, py::arg("tol") = 1e-4f,
+           py::arg("n_iter_no_change") = 10, py::arg("verbose") = true,
+           py::call_guard<py::gil_scoped_release>())
+      .def("predict", &Model::predict, py::arg("X"),
+           py::call_guard<py::gil_scoped_release>());
 }

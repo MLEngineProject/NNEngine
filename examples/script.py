@@ -27,26 +27,25 @@ def test_dataset(name, X, y, epochs, lr, batch_size, hidden_size, seed, use_l2=T
     y_onehot = encoder.fit_transform(y.reshape(-1, 1))
 
     X_train, X_test, y_train, y_test = train_test_split(
-        X.astype(np.float64),
-        y_onehot,
+        X.astype(np.float32),
+        y_onehot.astype(np.float32),
         test_size=0.2,
         stratify=y,
         random_state=seed,
     )
 
     scaler = StandardScaler()
-    X_train_scaled = scaler.fit_transform(X_train)
-    X_test_scaled = scaler.transform(X_test)
+    X_train_scaled = scaler.fit_transform(X_train).astype(np.float32)
+    X_test_scaled = scaler.transform(X_test).astype(np.float32)
 
     model = nn_core.Model()
     model.add(nn_core.DenseLayer(num_features, hidden_size))
     model.add(nn_core.ReLULayer())
     model.add(nn_core.DenseLayer(hidden_size, num_classes))
-    model.add(nn_core.SoftmaxLayer())
 
-    optimizer = nn_core.Adam(learning_rate=lr)
-    loss_fn = nn_core.CategoricalCrossEntropyLoss()
-    regularizer = nn_core.L2Regularizer(l2=0.0001) if use_l2 else None
+    optimizer = nn_core.Adam(learning_rate=np.float32(lr))
+    loss_fn = nn_core.SoftmaxCrossEntropyLoss()
+    regularizer = nn_core.L2Regularizer(l2=np.float32(0.0001)) if use_l2 else None
 
     model.compile(optimizer, loss_fn, regularizer)
 
@@ -56,13 +55,14 @@ def test_dataset(name, X, y, epochs, lr, batch_size, hidden_size, seed, use_l2=T
         y_train,
         epochs=epochs,
         batch_size=batch_size,
-        tol=1e-4,
+        tol=np.float32(1e-4),
         n_iter_no_change=10,
         verbose=False,
     )
 
-    nn_pred_probs = model.predict(X_test_scaled)
-    nn_preds = np.argmax(nn_pred_probs, axis=1)
+    nn_pred_logits = model.predict(X_test_scaled)
+    nn_preds = np.argmax(nn_pred_logits, axis=1)
+    
     y_test_labels = np.argmax(y_test, axis=1)
     t1 = time.perf_counter()
 
@@ -75,11 +75,11 @@ def test_dataset(name, X, y, epochs, lr, batch_size, hidden_size, seed, use_l2=T
         activation="relu",
         solver="adam",
         batch_size=batch_size,
-        learning_rate_init=lr,
+        learning_rate_init=np.float32(lr),
         max_iter=epochs,
-        tol=1e-4,
+        tol=np.float32(1e-4),
         n_iter_no_change=10,
-        alpha=0.0001 if use_l2 else 0.0,
+        alpha=np.float32(0.0001) if use_l2 else np.float32(0.0),
         random_state=seed,
     )
 
@@ -106,7 +106,7 @@ def main() -> None:
         iris.data,
         iris.target,
         epochs=100,
-        lr=0.01,
+        lr=np.float32(0.01),
         batch_size=16,
         hidden_size=16,
         seed=args.seed,
@@ -118,7 +118,7 @@ def main() -> None:
         digits.data,
         digits.target,
         epochs=50,
-        lr=0.001,
+        lr=np.float32(0.001),
         batch_size=32,
         hidden_size=128,
         seed=args.seed + 1,
@@ -130,7 +130,7 @@ def main() -> None:
         faces.data,
         faces.target,
         epochs=50,
-        lr=0.001,
+        lr=np.float32(0.001),
         batch_size=32,
         hidden_size=128,
         seed=args.seed + 2,

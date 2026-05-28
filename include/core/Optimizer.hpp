@@ -9,10 +9,10 @@ namespace mlengine::core {
 class Optimizer {
  protected:
   std::vector<autograd::Tensor*> parameters_;
-  double lr_;
+  float lr_;
 
  public:
-  Optimizer(double learning_rate) : lr_(learning_rate) {}
+  Optimizer(float learning_rate) : lr_(learning_rate) {}
   virtual ~Optimizer() = default;
 
   virtual void set_parameters(const std::vector<autograd::Tensor*>& params) {
@@ -30,7 +30,7 @@ class Optimizer {
 
 class SGD : public Optimizer {
  public:
-  SGD(double learning_rate = 0.01) : Optimizer(learning_rate) {}
+  SGD(float learning_rate = 0.01f) : Optimizer(learning_rate) {}
 
   void step() override {
     for (auto* p : parameters_) {
@@ -45,12 +45,12 @@ class Adam : public Optimizer {
   std::vector<autograd::MatrixRM> m_;
   std::vector<autograd::MatrixRM> v_;
   int t_ = 0;
-  double beta1_ = 0.9;
-  double beta2_ = 0.999;
-  double epsilon_ = 1e-8;
+  float beta1_ = 0.9f;
+  float beta2_ = 0.999f;
+  float epsilon_ = 1e-8f;
 
  public:
-  Adam(double learning_rate = 0.001) : Optimizer(learning_rate) {}
+  Adam(float learning_rate = 0.001f) : Optimizer(learning_rate) {}
 
   void set_parameters(const std::vector<autograd::Tensor*>& params) override {
     Optimizer::set_parameters(params);
@@ -65,21 +65,32 @@ class Adam : public Optimizer {
 
   void step() override {
     t_++;
-    double current_lr = lr_ * std::pow(0.999, t_ / 100.0);
+    float current_lr = lr_;
 
-    double bias_corr1 = 1.0 - std::pow(beta1_, static_cast<double>(t_));
-    double bias_corr2 = 1.0 - std::pow(beta2_, static_cast<double>(t_));
+    double bias_corr1 =
+        1.0 - std::pow(static_cast<double>(beta1_), static_cast<double>(t_));
+    double bias_corr2 =
+        1.0 - std::pow(static_cast<double>(beta2_), static_cast<double>(t_));
 
     for (size_t i = 0; i < parameters_.size(); ++i) {
       auto* p = parameters_[i];
       if (!p->requires_grad) continue;
 
-      m_[i] = beta1_ * m_[i] + (1.0 - beta1_) * p->grad;
-      v_[i] = beta2_ * v_[i] + (1.0 - beta2_) * p->grad.cwiseAbs2();
+      float* p_ptr = p->data.data();
+      float* g_ptr = p->grad.data();
+      float* m_ptr = m_[i].data();
+      float* v_ptr = v_[i].data();
+      size_t size = p->data.size();
 
-      p->data -= (current_lr * (m_[i].array() / bias_corr1) /
-                  ((v_[i].array() / bias_corr2).sqrt() + epsilon_))
-                     .matrix();
+#pragma omp simd
+      for (size_t j = 0; j < size; ++j) {
+        m_ptr[j] = beta1_ * m_ptr[j] + (1.0f - beta1_) * g_ptr[j];
+        v_ptr[j] = beta2_ * v_ptr[j] + (1.0f - beta2_) * (g_ptr[j] * g_ptr[j]);
+
+        p_ptr[j] -=
+            current_lr * (m_ptr[j] / static_cast<float>(bias_corr1)) /
+            (std::sqrt(v_ptr[j] / static_cast<float>(bias_corr2)) + epsilon_);
+      }
     }
   }
 };

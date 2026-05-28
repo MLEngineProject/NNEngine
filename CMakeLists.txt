@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.18)
 
+set(CMAKE_POLICY_VERSION_MINIMUM 3.5 CACHE STRING "" FORCE)
+
 if(POLICY CMP0135)
     cmake_policy(SET CMP0135 NEW)
 endif()
@@ -11,13 +13,15 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if(NOT MSVC)
     if(APPLE)
-        add_compile_options(-O3)
+        add_compile_options(-O3 -ffast-math)
     else()
-        add_compile_options(-O3 -march=native)
+        add_compile_options(-O3 -march=native -ffast-math)
     endif()
 endif()
 
 include(FetchContent)
+
+find_package(OpenMP)
 
 FetchContent_Declare(
     eigen
@@ -34,7 +38,22 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(pybind11)
 
-find_package(OpenMP)
+set(NOFORTRAN 1 CACHE BOOL "Build without Fortran" FORCE)
+set(USE_OPENMP 1 CACHE BOOL "Use OpenMP in OpenBLAS" FORCE)
+set(BUILD_WITHOUT_LAPACK 1 CACHE BOOL "We only need BLAS for Eigen" FORCE)
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build static OpenBLAS" FORCE)
+set(BUILD_TESTING OFF CACHE BOOL "Disable OpenBLAS tests" FORCE)
+
+message(STATUS "Fetching and configuring OpenBLAS from source...")
+FetchContent_Declare(
+    OpenBLAS
+    URL https://github.com/OpenMathLib/OpenBLAS/releases/download/v0.3.26/OpenBLAS-0.3.26.tar.gz
+)
+FetchContent_GetProperties(OpenBLAS)
+if(NOT openblas_POPULATED)
+    FetchContent_Populate(OpenBLAS)
+    add_subdirectory(${openblas_SOURCE_DIR} ${openblas_BINARY_DIR} EXCLUDE_FROM_ALL)
+endif()
 
 pybind11_add_module(nn_core NO_EXTRAS
     src/binding.cpp 
@@ -42,12 +61,8 @@ pybind11_add_module(nn_core NO_EXTRAS
     src/parametric/DenseLayer.cpp
 )
 
-target_include_directories(nn_core SYSTEM PRIVATE 
-    include 
-    ${eigen_SOURCE_DIR}
-)
-
-target_link_libraries(nn_core PRIVATE pybind11::module)
+target_include_directories(nn_core SYSTEM PRIVATE include ${eigen_SOURCE_DIR})
+target_link_libraries(nn_core PRIVATE pybind11::module openblas)
 
 if(OpenMP_CXX_FOUND)
     target_link_libraries(nn_core PRIVATE OpenMP::OpenMP_CXX)
@@ -56,6 +71,5 @@ else()
     message(WARNING "OpenMP NOT found: Falling back to single-threaded NNEngine.")
 endif()
 
-target_compile_definitions(nn_core PRIVATE EIGEN_USE_THREADS)
-
+target_compile_definitions(nn_core PRIVATE EIGEN_USE_BLAS)
 install(TARGETS nn_core DESTINATION .)

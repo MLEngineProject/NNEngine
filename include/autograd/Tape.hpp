@@ -1,75 +1,48 @@
 #pragma once
+
 #include <deque>
 #include <memory>
-#include <utility>
 #include <vector>
 
 #include "autograd/Tensor.hpp"
 
 namespace mlengine::autograd {
 
+// 1. Flat Enum instead of Polymorphism
+enum class OpType { MatMul, AddBias, ReLU, LeakyReLU, Softmax };
+
+// 2. POD Struct (Plain Old Data) - Zero Virtual Functions, Zero Heap
+// Allocations
 struct OpNode {
-  virtual ~OpNode() = default;
-  virtual void backward() = 0;
-};
+  OpType type;
+  Tensor *a, *b, *out;
+  float alpha;
 
-struct MatMulOp : public OpNode {
-  Tensor *a_, *b_, *out_;
-  MatMulOp(Tensor* a, Tensor* b, Tensor* out) : a_(a), b_(b), out_(out) {}
-  void backward() override {
-    if (a_->requires_grad)
-      a_->grad.noalias() += out_->grad * b_->data.transpose();
-    if (b_->requires_grad)
-      b_->grad.noalias() += a_->data.transpose() * out_->grad;
-  }
-};
-
-struct AddBiasOp : public OpNode {
-  Tensor *a_, *b_, *out_;
-  AddBiasOp(Tensor* a, Tensor* b, Tensor* out) : a_(a), b_(b), out_(out) {}
-  void backward() override {
-    if (a_->requires_grad) a_->grad.noalias() += out_->grad;
-    if (b_->requires_grad) b_->grad.noalias() += out_->grad.colwise().sum();
-  }
-};
-
-struct ReLUOp : public OpNode {
-  Tensor *a_, *out_;
-  ReLUOp(Tensor* a, Tensor* out) : a_(a), out_(out) {}
-  void backward() override {
-    if (a_->requires_grad) {
-      a_->grad.array() +=
-          (a_->data.array() > 0.0).cast<double>() * out_->grad.array();
-    }
-  }
-};
-
-struct LeakyReLUOp : public OpNode {
-  Tensor *a_, *out_;
-  double alpha_;
-  LeakyReLUOp(Tensor* a, Tensor* out, double alpha)
-      : a_(a), out_(out), alpha_(alpha) {}
-  void backward() override {
-    if (a_->requires_grad) {
-      a_->grad.array() +=
-          (a_->data.array() > 0.0).cast<double>() * out_->grad.array() +
-          (a_->data.array() <= 0.0).cast<double>() * alpha_ *
-              out_->grad.array();
-    }
-  }
-};
-
-struct SoftmaxOp : public OpNode {
-  Tensor *a_, *out_;
-  SoftmaxOp(Tensor* a, Tensor* out) : a_(a), out_(out) {}
-  void backward() override {
-    if (a_->requires_grad) {
-      Eigen::MatrixXd dot_prod =
-          (out_->data.array() * out_->grad.array()).rowwise().sum();
-      a_->grad.noalias() += (out_->data.array() *
-                             (out_->grad.array() -
-                              dot_prod.replicate(1, out_->grad.cols()).array()))
-                                .matrix();
+  void backward() {
+    switch (type) {
+      case OpType::MatMul:
+        if (a->requires_grad)
+          a->grad.noalias() += out->grad * b->data.transpose();
+        if (b->requires_grad)
+          b->grad.noalias() += a->data.transpose() * out->grad;
+        break;
+      case OpType::AddBias:
+        if (a->requires_grad) a->grad.noalias() += out->grad;
+        if (b->requires_grad) b->grad.noalias() += out->grad.colwise().sum();
+        break;
+      case OpType::ReLU:
+        if (a->requires_grad)
+          a->grad.array() +=
+              (a->data.array() > 0.0f).select(out->grad.array(), 0.0f);
+        break;
+      case OpType::LeakyReLU:
+        if (a->requires_grad)
+          a->grad.array() +=
+              (a->data.array() > 0.0f)
+                  .select(out->grad.array(), alpha * out->grad.array());
+        break;
+      case OpType::Softmax:
+        break;
     }
   }
 };
@@ -77,96 +50,96 @@ struct SoftmaxOp : public OpNode {
 class Tape {
   std::deque<Tensor> tensor_pool_;
   size_t tensor_idx_ = 0;
-  std::vector<std::unique_ptr<OpNode>> ops_;
+
+  // 3. 100% Contiguous Memory Array
+  std::vector<OpNode> ops_;
   bool record_ops_;
 
  public:
   explicit Tape(bool record_ops = true) : record_ops_(record_ops) {
-    ops_.reserve(10000);
+    ops_.reserve(10000);  // Pre-allocate all graph memory at initialization
+  }
+
+  Tensor* alloc_tensor(int rows, int cols, bool requires_grad = true) {
+    bool req_grad_actual = record_ops_ && requires_grad;
+    if (tensor_idx_ >= tensor_pool_.size()) {
+      tensor_pool_.emplace_back(MatrixRM(rows, cols), req_grad_actual);
+    } else {
+      if (tensor_pool_[tensor_idx_].data.rows() != rows ||
+          tensor_pool_[tensor_idx_].data.cols() != cols) {
+        tensor_pool_[tensor_idx_].data.resize(rows, cols);
+      }
+      tensor_pool_[tensor_idx_].requires_grad = req_grad_actual;
+      if (req_grad_actual) {
+        if (tensor_pool_[tensor_idx_].grad.rows() != rows ||
+            tensor_pool_[tensor_idx_].grad.cols() != cols) {
+          tensor_pool_[tensor_idx_].grad.resize(rows, cols);
+        }
+        tensor_pool_[tensor_idx_].grad.setZero();
+      }
+    }
+    return &tensor_pool_[tensor_idx_++];
   }
 
   template <typename Derived>
   Tensor* push_expr(const Eigen::MatrixBase<Derived>& expr,
                     bool requires_grad = true) {
-    if (tensor_idx_ >= tensor_pool_.size()) {
-      tensor_pool_.emplace_back(expr.eval(), record_ops_ && requires_grad);
-    } else {
-      tensor_pool_[tensor_idx_].data = expr;
-      tensor_pool_[tensor_idx_].requires_grad = record_ops_ && requires_grad;
-      if (record_ops_ && requires_grad)
-        tensor_pool_[tensor_idx_].grad.setZero(expr.rows(), expr.cols());
-    }
-    return &tensor_pool_[tensor_idx_++];
+    Tensor* t = alloc_tensor(expr.rows(), expr.cols(), requires_grad);
+    t->data.noalias() = expr;
+    return t;
   }
 
   Tensor* push_tensor(const MatrixRM& data, bool requires_grad = true) {
     return push_expr(data, requires_grad);
   }
 
-  Tensor* push_tensor(MatrixRM&& data, bool requires_grad = true) {
-    if (tensor_idx_ >= tensor_pool_.size()) {
-      tensor_pool_.emplace_back(std::move(data), record_ops_ && requires_grad);
-    } else {
-      tensor_pool_[tensor_idx_].data = std::move(data);
-      tensor_pool_[tensor_idx_].requires_grad = record_ops_ && requires_grad;
-      if (record_ops_ && requires_grad) {
-        tensor_pool_[tensor_idx_].grad.setZero(
-            tensor_pool_[tensor_idx_].data.rows(),
-            tensor_pool_[tensor_idx_].data.cols());
-      }
-    }
-    return &tensor_pool_[tensor_idx_++];
-  }
-
+  // 4. Graph construction now just pushes a struct to the vector
   Tensor* matmul(Tensor* a, Tensor* b) {
-    MatrixRM out_data(a->data.rows(), b->data.cols());
-    out_data.noalias() = a->data * b->data;
     bool req_grad = record_ops_ && (a->requires_grad || b->requires_grad);
-    Tensor* out = push_tensor(std::move(out_data), req_grad);
-    if (req_grad) ops_.push_back(std::make_unique<MatMulOp>(a, b, out));
+    Tensor* out = alloc_tensor(a->data.rows(), b->data.cols(), req_grad);
+    out->data.noalias() = a->data * b->data;
+    if (req_grad) ops_.push_back({OpType::MatMul, a, b, out, 0.0f});
     return out;
   }
 
   Tensor* add_bias(Tensor* a, Tensor* b) {
-    MatrixRM out_data = a->data.rowwise() + b->data.row(0);
     bool req_grad = record_ops_ && (a->requires_grad || b->requires_grad);
-    Tensor* out = push_tensor(std::move(out_data), req_grad);
-    if (req_grad) ops_.push_back(std::make_unique<AddBiasOp>(a, b, out));
+    Tensor* out = alloc_tensor(a->data.rows(), a->data.cols(), req_grad);
+    out->data.noalias() = a->data.rowwise() + b->data.row(0);
+    if (req_grad) ops_.push_back({OpType::AddBias, a, b, out, 0.0f});
     return out;
   }
 
   Tensor* relu(Tensor* a) {
-    MatrixRM out_data = a->data.cwiseMax(0.0);
     bool req_grad = record_ops_ && a->requires_grad;
-    Tensor* out = push_tensor(std::move(out_data), req_grad);
-    if (req_grad) ops_.push_back(std::make_unique<ReLUOp>(a, out));
+    Tensor* out = alloc_tensor(a->data.rows(), a->data.cols(), req_grad);
+    out->data.noalias() = a->data.cwiseMax(0.0f);
+    if (req_grad) ops_.push_back({OpType::ReLU, a, nullptr, out, 0.0f});
     return out;
   }
 
-  Tensor* leaky_relu(Tensor* a, double alpha) {
-    MatrixRM out_data = a->data.unaryExpr(
-        [alpha](double x) { return x > 0.0 ? x : alpha * x; });
+  Tensor* leaky_relu(Tensor* a, float alpha) {
     bool req_grad = record_ops_ && a->requires_grad;
-    Tensor* out = push_tensor(std::move(out_data), req_grad);
-    if (req_grad) ops_.push_back(std::make_unique<LeakyReLUOp>(a, out, alpha));
+    Tensor* out = alloc_tensor(a->data.rows(), a->data.cols(), req_grad);
+    out->data.noalias() = a->data.unaryExpr(
+        [alpha](float x) { return x > 0.0f ? x : alpha * x; });
+    if (req_grad) ops_.push_back({OpType::LeakyReLU, a, nullptr, out, alpha});
     return out;
   }
 
   Tensor* softmax(Tensor* a) {
-    MatrixRM out_data(a->data.rows(), a->data.cols());
-    for (int i = 0; i < a->data.rows(); ++i) {
-      double max_val = a->data.row(i).maxCoeff();
-      MatrixRM exp_row = (a->data.row(i).array() - max_val).exp();
-      out_data.row(i) = (exp_row.array() / exp_row.sum()).matrix();
-    }
     bool req_grad = record_ops_ && a->requires_grad;
-    Tensor* out = push_tensor(std::move(out_data), req_grad);
-    if (req_grad) ops_.push_back(std::make_unique<SoftmaxOp>(a, out));
+    Tensor* out = alloc_tensor(a->data.rows(), a->data.cols(), req_grad);
+    Eigen::VectorXf max_vals = a->data.rowwise().maxCoeff();
+    MatrixRM exp_data = (a->data.colwise() - max_vals).array().exp();
+    Eigen::VectorXf sums = exp_data.rowwise().sum();
+    out->data.array() = exp_data.array().colwise() / sums.array();
+    if (req_grad) ops_.push_back({OpType::Softmax, a, nullptr, out, 0.0f});
     return out;
   }
 
   void backward() {
-    for (auto it = ops_.rbegin(); it != ops_.rend(); ++it) (*it)->backward();
+    for (auto it = ops_.rbegin(); it != ops_.rend(); ++it) it->backward();
   }
 
   void reset() {
@@ -174,5 +147,4 @@ class Tape {
     tensor_idx_ = 0;
   }
 };
-
 }  // namespace mlengine::autograd
