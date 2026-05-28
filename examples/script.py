@@ -24,15 +24,20 @@ def test_dataset(name, X, y, epochs, lr, batch_size, hidden_size):
     X_train_scaled = scaler.fit_transform(X_train)
     X_test_scaled = scaler.transform(X_test)
 
+    # 1. NNEngine
     model = nn_core.Model()
     model.add(nn_core.DenseLayer(num_features, hidden_size))
     model.add(nn_core.ReLULayer())
     model.add(nn_core.DenseLayer(hidden_size, num_classes))
     model.add(nn_core.SoftmaxLayer())
-    model.compile(nn_core.CategoricalCrossEntropyLoss())
+
+    optimizer = nn_core.Adam(learning_rate=lr)
+    loss_fn = nn_core.CategoricalCrossEntropyLoss()
+    model.compile(optimizer, loss_fn)
 
     t0 = time.perf_counter()
-    model.fit(X_train_scaled, y_train, epochs=epochs, learning_rate=lr, batch_size=batch_size, verbose=False)
+    model.fit(X_train_scaled, y_train, epochs=epochs, batch_size=batch_size, 
+              tol=1e-4, n_iter_no_change=10, verbose=False)
     
     nn_pred_probs = model.predict(X_test_scaled)
     nn_preds = np.argmax(nn_pred_probs, axis=1)
@@ -41,16 +46,18 @@ def test_dataset(name, X, y, epochs, lr, batch_size, hidden_size):
 
     nn_time = t1 - t0
     nn_acc = accuracy_score(y_test_labels, nn_preds) * 100
-    print(f"NNEngine   — Accuracy: {nn_acc:.2f}%  |  Time: {nn_time:.4f}s")
+    print(f"NNEngine (Adam) — Accuracy: {nn_acc:.2f}%  |  Time: {nn_time:.4f}s")
 
+    # 2. Sklearn
     sk_model = MLPClassifier(
         hidden_layer_sizes=(hidden_size,), 
         activation='relu', 
-        solver='sgd',
+        solver='adam', 
         batch_size=batch_size, 
         learning_rate_init=lr,
         max_iter=epochs,
-        momentum=0.0,
+        tol=1e-4,
+        n_iter_no_change=10,
         random_state=42
     )
     
@@ -62,15 +69,18 @@ def test_dataset(name, X, y, epochs, lr, batch_size, hidden_size):
 
     sk_time = t1 - t0
     sk_acc = accuracy_score(y_test_labels, sk_preds) * 100
-    print(f"Sklearn    — Accuracy: {sk_acc:.2f}%  |  Time: {sk_time:.4f}s")
+    print(f"Sklearn  (Adam) — Accuracy: {sk_acc:.2f}%  |  Time: {sk_time:.4f}s")
     print(f"Speedup: {sk_time / nn_time:.2f}x")
 
 if __name__ == "__main__":
     iris = load_iris()
-    test_dataset("Iris Flower", iris.data, iris.target, epochs=300, lr=0.05, batch_size=16, hidden_size=16)
+    test_dataset("Iris Flower", iris.data, iris.target, 
+                 epochs=100, lr=0.01, batch_size=16, hidden_size=16)
     
     digits = load_digits()
-    test_dataset("Handwritten Digits", digits.data, digits.target, epochs=150, lr=0.05, batch_size=32, hidden_size=128)
+    test_dataset("Handwritten Digits", digits.data, digits.target, 
+                 epochs=50, lr=0.001, batch_size=32, hidden_size=128)
     
     faces = fetch_olivetti_faces()
-    test_dataset("Olivetti Faces", faces.data, faces.target, epochs=100, lr=0.01, batch_size=32, hidden_size=128)
+    test_dataset("Olivetti Faces", faces.data, faces.target, 
+                 epochs=50, lr=0.001, batch_size=32, hidden_size=128)

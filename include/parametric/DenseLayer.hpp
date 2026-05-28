@@ -1,4 +1,6 @@
 #pragma once
+#include <vector>
+
 #include "autograd/Tensor.hpp"
 #include "core/Layer.hpp"
 
@@ -9,7 +11,8 @@ class DenseLayer : public core::Layer {
   DenseLayer(int input_dim, int output_dim);
   autograd::Tensor* forward(autograd::Tape& tape,
                             autograd::Tensor* input) override;
-  void update_weights(double learning_rate) override;
+
+  std::vector<autograd::Tensor*> parameters() override;
 
   core::MatrixRM get_weights() const { return weights_.data; }
   core::MatrixRM get_bias() const { return bias_.data; }

@@ -19,10 +19,13 @@ class Sequential : public core::Layer {
     return current;
   }
 
-  void update_weights(double learning_rate) override {
+  std::vector<autograd::Tensor*> parameters() override {
+    std::vector<autograd::Tensor*> params;
     for (auto& layer : layers_) {
-      layer->update_weights(learning_rate);
+      auto l_params = layer->parameters();
+      params.insert(params.end(), l_params.begin(), l_params.end());
     }
+    return params;
   }
 
  private:

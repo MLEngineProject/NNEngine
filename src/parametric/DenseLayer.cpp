@@ -16,11 +16,8 @@ autograd::Tensor* DenseLayer::forward(autograd::Tape& tape,
   return tape.add_bias(mm, &bias_);
 }
 
-void DenseLayer::update_weights(double learning_rate) {
-  weights_.data -= learning_rate * weights_.grad;
-  bias_.data -= learning_rate * bias_.grad;
-  weights_.zero_grad();
-  bias_.zero_grad();
+std::vector<autograd::Tensor*> DenseLayer::parameters() {
+  return {&weights_, &bias_};
 }
 
 }  // namespace mlengine::parametric
