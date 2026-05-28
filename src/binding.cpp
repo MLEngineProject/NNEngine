@@ -8,6 +8,8 @@
 #include "core/Loss.hpp"
 #include "core/Model.hpp"
 #include "core/Optimizer.hpp"
+#include "core/Random.hpp"
+#include "core/Regularizer.hpp"
 #include "parametric/DenseLayer.hpp"
 #include "parametric/LeakyReLULayer.hpp"
 #include "parametric/ReLULayer.hpp"
@@ -21,10 +23,16 @@ using namespace mlengine::parametric;
 PYBIND11_MODULE(nn_core, m) {
   m.doc() = "C++ Parametric Optimization Layer Engine for NNEngine";
 
+  // Base Classes
   py::class_<Layer, std::shared_ptr<Layer>>(m, "Layer");
   py::class_<Loss, std::shared_ptr<Loss>>(m, "Loss");
   py::class_<Optimizer, std::shared_ptr<Optimizer>>(m, "Optimizer");
+  py::class_<Regularizer, std::shared_ptr<Regularizer>>(m, "Regularizer");
 
+  m.def("set_seed", &set_seed, py::arg("seed"),
+        "Seed NNEngine's shared random number generator.");
+
+  // Losses
   py::class_<MSELoss, Loss, std::shared_ptr<MSELoss>>(m, "MSELoss")
       .def(py::init<>());
   py::class_<CategoricalCrossEntropyLoss, Loss,
@@ -32,12 +40,19 @@ PYBIND11_MODULE(nn_core, m) {
       m, "CategoricalCrossEntropyLoss")
       .def(py::init<>());
 
+  // Regularizers
+  py::class_<L2Regularizer, Regularizer, std::shared_ptr<L2Regularizer>>(
+      m, "L2Regularizer")
+      .def(py::init<double>(), py::arg("l2") = 0.0001);
+
+  // Optimizers
   py::class_<SGD, Optimizer, std::shared_ptr<SGD>>(m, "SGD").def(
       py::init<double>(), py::arg("learning_rate") = 0.01);
 
   py::class_<Adam, Optimizer, std::shared_ptr<Adam>>(m, "Adam").def(
       py::init<double>(), py::arg("learning_rate") = 0.001);
 
+  // Layers
   py::class_<DenseLayer, Layer, std::shared_ptr<DenseLayer>>(m, "DenseLayer")
       .def(py::init<int, int>())
       .def("get_weights", &DenseLayer::get_weights)
@@ -58,10 +73,12 @@ PYBIND11_MODULE(nn_core, m) {
       .def(py::init<>())
       .def("add", &Sequential::add, py::arg("layer"));
 
+  // Model
   py::class_<Model, std::shared_ptr<Model>>(m, "Model")
       .def(py::init<>())
       .def("add", &Model::add, py::arg("layer"))
-      .def("compile", &Model::compile, py::arg("optimizer"), py::arg("loss_fn"))
+      .def("compile", &Model::compile, py::arg("optimizer"), py::arg("loss_fn"),
+           py::arg("regularizer") = nullptr)
       .def("fit", &Model::fit, py::arg("X"), py::arg("y"),
            py::arg("epochs") = 100, py::arg("batch_size") = 32,
            py::arg("tol") = 1e-4, py::arg("n_iter_no_change") = 10,

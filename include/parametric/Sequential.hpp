@@ -21,7 +21,8 @@ class Sequential : public core::Layer {
 
   std::vector<autograd::Tensor*> parameters() override {
     std::vector<autograd::Tensor*> params;
-    for (auto& layer : layers_) {
+    params.reserve(layers_.size() * 2);
+    for (const auto& layer : layers_) {
       auto l_params = layer->parameters();
       params.insert(params.end(), l_params.begin(), l_params.end());
     }
