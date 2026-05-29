@@ -7,6 +7,14 @@ endif()
 
 project(NN_ENGINE LANGUAGES CXX)
 
+find_program(CCACHE_PROGRAM ccache)
+if(CCACHE_PROGRAM)
+    set(CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_PROGRAM}" CACHE STRING "Compiler launcher" FORCE)
+    message(STATUS "ccache found: Enabling compiler caching.")
+else()
+    message(STATUS "ccache not found. Install it to speed up subsequent builds.")
+endif()
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 

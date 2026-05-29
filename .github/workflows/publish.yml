@@ -26,13 +26,16 @@ jobs:
       - name: Build wheels
         uses: pypa/cibuildwheel@v3.4.1
         env:
-          CIBW_BEFORE_ALL_MACOS: brew install libomp
+          CIBW_BEFORE_ALL_LINUX: yum install -y ccache
+          CIBW_BEFORE_ALL_MACOS: brew install libomp ccache
           CIBW_BUILD_FRONTEND: pip
           CIBW_ENVIRONMENT_LINUX: >
-            PATH="$PATH:/usr/lib/ccache:/usr/lib64/ccache"
+            PATH="$PATH:/usr/lib64/ccache:/usr/lib/ccache"
             CMAKE_CXX_COMPILER_LAUNCHER=ccache
           CIBW_ENVIRONMENT_MACOS: >
             PATH="$PATH:/usr/local/opt/ccache/libexec"
+            CMAKE_CXX_COMPILER_LAUNCHER=ccache
+          CIBW_ENVIRONMENT_WINDOWS: >
             CMAKE_CXX_COMPILER_LAUNCHER=ccache
 
       - uses: actions/upload-artifact@v4
