@@ -34,8 +34,8 @@ Homepage = "https://github.com/MLEngineProject/NNEngine"
 [tool.scikit-build]
 cmake.version = ">=3.18"
 wheel.install-dir = "."
-build-dir = "build"
+build-dir = "build/{wheel_tag}"
 wheel.packages = ["nnengine"]
 
 [tool.cibuildwheel]
-skip = "*-musllinux_*"
+skip = "*-musllinux_* *-win32"
