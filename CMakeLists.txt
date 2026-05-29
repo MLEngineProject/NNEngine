@@ -39,6 +39,9 @@ if(DEV_MODE)
     endif()
 else()
     message(STATUS "DEV_MODE is OFF (PROD): Fetching dependencies from source...")
+    
+    set(FETCHCONTENT_BASE_DIR "${CMAKE_SOURCE_DIR}/.cmake_deps" CACHE PATH "Cache fetch content" FORCE)
+    
     include(FetchContent)
 
     FetchContent_Declare(

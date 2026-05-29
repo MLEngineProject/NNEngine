@@ -17,11 +17,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Setup ccache
+      - name: Create ccache directory
         if: runner.os != 'Windows'
-        uses: hendrikmuhs/ccache-action@v1.2
+        run: mkdir -p .ccache
+
+      - name: Cache ccache
+        if: runner.os != 'Windows'
+        uses: actions/cache@v4
         with:
-          key: ${{ matrix.os }}
+          path: .ccache
+          key: ccache-${{ matrix.os }}-${{ github.sha }}
+          restore-keys: |
+            ccache-${{ matrix.os }}-
 
       - name: Build wheels
         uses: pypa/cibuildwheel@v3.4.1
@@ -32,12 +39,17 @@ jobs:
           CIBW_ENVIRONMENT_LINUX: >
             PATH="/usr/lib64/ccache:/usr/lib/ccache:$PATH"
             CMAKE_CXX_COMPILER_LAUNCHER=ccache
-            CMAKE_GENERATOR=Ninja
-            CCACHE_DIR=/home/runner/work/NNEngine/NNEngine/.ccache
+            CCACHE_DIR=/project/.ccache
+            CCACHE_COMPILERCHECK=content
           CIBW_ENVIRONMENT_MACOS: >
-            PATH="$PATH:/usr/local/opt/ccache/libexec"
+            PATH="/opt/homebrew/opt/ccache/libexec:/usr/local/opt/ccache/libexec:$PATH"
             CMAKE_CXX_COMPILER_LAUNCHER=ccache
-            CCACHE_DIR=/Users/runner/work/NNEngine/NNEngine/.ccache
+            CCACHE_DIR=${{ github.workspace }}/.ccache
+            CCACHE_COMPILERCHECK=content
+
+      - name: Fix cache permissions for Docker
+        if: runner.os == 'Linux'
+        run: sudo chown -R $USER:$USER .ccache
 
       - uses: actions/upload-artifact@v4
         with:
