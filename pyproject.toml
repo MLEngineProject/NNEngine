@@ -16,6 +16,8 @@ dependencies = [
 [tool.scikit-build]
 cmake.version = ">=3.18"
 wheel.install-dir = "."
+build-dir = "build"
+wheel.packages = ["nnengine"]
 
 [tool.cibuildwheel]
 skip = "*-musllinux_*"

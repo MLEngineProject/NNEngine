@@ -15,6 +15,52 @@ struct OpNode {
   Tensor *a, *b, *out;
   float alpha;
 
+  void forward() {
+    switch (type) {
+      case OpType::MatMul:
+        if (out->data.rows() != a->data.rows()) {
+          out->data.resize(a->data.rows(), b->data.cols());
+          if (out->requires_grad) {
+            out->grad.resize(a->data.rows(), b->data.cols());
+            out->grad.setZero();
+          }
+        }
+        out->data.noalias() = a->data * b->data;
+        break;
+      case OpType::AddBias:
+        if (out->data.rows() != a->data.rows()) {
+          out->data.resize(a->data.rows(), a->data.cols());
+          if (out->requires_grad) {
+            out->grad.resize(a->data.rows(), a->data.cols());
+            out->grad.setZero();
+          }
+        }
+        out->data.noalias() = a->data.rowwise() + b->data.row(0);
+        break;
+      case OpType::ReLU:
+        if (out->data.rows() != a->data.rows()) {
+          out->data.resize(a->data.rows(), a->data.cols());
+          if (out->requires_grad) {
+            out->grad.resize(a->data.rows(), a->data.cols());
+            out->grad.setZero();
+          }
+        }
+        out->data.noalias() = a->data.cwiseMax(0.0f);
+        break;
+      case OpType::LeakyReLU:
+        if (out->data.rows() != a->data.rows()) {
+          out->data.resize(a->data.rows(), a->data.cols());
+          if (out->requires_grad) {
+            out->grad.resize(a->data.rows(), a->data.cols());
+            out->grad.setZero();
+          }
+        }
+        out->data.noalias() = a->data.unaryExpr(
+            [this](float x) { return x > 0.0f ? x : alpha * x; });
+        break;
+    }
+  }
+
   void backward() {
     switch (type) {
       case OpType::MatMul:
@@ -43,12 +89,12 @@ struct OpNode {
 };
 
 class Tape {
+ public:
   std::deque<Tensor> tensor_pool_;
   size_t tensor_idx_ = 0;
   std::vector<OpNode> ops_;
   bool record_ops_;
 
- public:
   explicit Tape(bool record_ops = true) : record_ops_(record_ops) {
     ops_.reserve(10000);
   }
@@ -92,7 +138,7 @@ class Tape {
     bool req_grad = record_ops_ && (a->requires_grad || b->requires_grad);
     Tensor* out = alloc_tensor(a->data.rows(), b->data.cols(), req_grad);
     out->data.noalias() = a->data * b->data;
-    if (req_grad) ops_.push_back({OpType::MatMul, a, b, out, 0.0f});
+    if (record_ops_) ops_.push_back({OpType::MatMul, a, b, out, 0.0f});
     return out;
   }
 
@@ -100,7 +146,7 @@ class Tape {
     bool req_grad = record_ops_ && (a->requires_grad || b->requires_grad);
     Tensor* out = alloc_tensor(a->data.rows(), a->data.cols(), req_grad);
     out->data.noalias() = a->data.rowwise() + b->data.row(0);
-    if (req_grad) ops_.push_back({OpType::AddBias, a, b, out, 0.0f});
+    if (record_ops_) ops_.push_back({OpType::AddBias, a, b, out, 0.0f});
     return out;
   }
 
@@ -108,7 +154,7 @@ class Tape {
     bool req_grad = record_ops_ && a->requires_grad;
     Tensor* out = alloc_tensor(a->data.rows(), a->data.cols(), req_grad);
     out->data.noalias() = a->data.cwiseMax(0.0f);
-    if (req_grad) ops_.push_back({OpType::ReLU, a, nullptr, out, 0.0f});
+    if (record_ops_) ops_.push_back({OpType::ReLU, a, nullptr, out, 0.0f});
     return out;
   }
 
@@ -117,17 +163,29 @@ class Tape {
     Tensor* out = alloc_tensor(a->data.rows(), a->data.cols(), req_grad);
     out->data.noalias() = a->data.unaryExpr(
         [alpha](float x) { return x > 0.0f ? x : alpha * x; });
-    if (req_grad) ops_.push_back({OpType::LeakyReLU, a, nullptr, out, alpha});
+    if (record_ops_)
+      ops_.push_back({OpType::LeakyReLU, a, nullptr, out, alpha});
     return out;
   }
 
-  void backward() {
+  void replay_forward() {
+    for (auto& op : ops_) op.forward();
+  }
+
+  void replay_backward() {
     for (auto it = ops_.rbegin(); it != ops_.rend(); ++it) it->backward();
   }
+
+  void zero_grads() {
+    for (auto& t : tensor_pool_) t.zero_grad();
+  }
+
+  void backward() { replay_backward(); }
 
   void reset() {
     ops_.clear();
     tensor_idx_ = 0;
   }
 };
+
 }  // namespace mlengine::autograd

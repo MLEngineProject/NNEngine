@@ -1,7 +1,5 @@
 import argparse
 import time
-
-import nn_core
 import numpy as np
 from sklearn.datasets import fetch_olivetti_faces, load_digits, load_iris
 from sklearn.metrics import accuracy_score
@@ -9,15 +7,26 @@ from sklearn.model_selection import train_test_split
 from sklearn.neural_network import MLPClassifier
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
+import nnengine as nn
 
 def seed_everything(seed: int) -> None:
     np.random.seed(seed)
-    nn_core.set_seed(seed)
+    nn.set_seed(seed)
 
+class BenchmarkNet(nn.Module):
+    def __init__(self, input_dim, hidden_dim, output_dim):
+        super().__init__()
+        self.fc1 = self.add_module(nn.DenseLayer(input_dim, hidden_dim))
+        self.relu = self.add_module(nn.ReLULayer())
+        self.fc2 = self.add_module(nn.DenseLayer(hidden_dim, output_dim))
+
+    def forward(self, tape, x):
+        x = self.fc1.forward(tape, x)
+        x = self.relu.forward(tape, x)
+        return self.fc2.forward(tape, x)
 
 def test_dataset(name, X, y, epochs, lr, batch_size, hidden_size, seed, use_l2=True):
     print(f"\n--- Testing {name} ---")
-
     seed_everything(seed)
 
     num_features = X.shape[1]
@@ -38,38 +47,33 @@ def test_dataset(name, X, y, epochs, lr, batch_size, hidden_size, seed, use_l2=T
     X_train_scaled = scaler.fit_transform(X_train).astype(np.float32)
     X_test_scaled = scaler.transform(X_test).astype(np.float32)
 
-    model = nn_core.Model()
-    model.add(nn_core.DenseLayer(num_features, hidden_size))
-    model.add(nn_core.ReLULayer())
-    model.add(nn_core.DenseLayer(hidden_size, num_classes))
+    
+    model = BenchmarkNet(num_features, hidden_size, num_classes)
+    
+    optimizer = nn.Adam(learning_rate=np.float32(lr))
+    loss_fn = nn.SoftmaxCrossEntropyLoss()
+    regularizer = nn.L2Regularizer(l2=np.float32(0.0001)) if use_l2 else None
 
-    optimizer = nn_core.Adam(learning_rate=np.float32(lr))
-    loss_fn = nn_core.SoftmaxCrossEntropyLoss()
-    regularizer = nn_core.L2Regularizer(l2=np.float32(0.0001)) if use_l2 else None
-
-    model.compile(optimizer, loss_fn, regularizer)
+    dataloader = nn.DataLoader(
+        X_train_scaled, y_train, batch_size=batch_size, shuffle=True, drop_last=True
+    )
+    
+    trainer = nn.JITCompiler(model, optimizer, loss_fn, regularizer)
 
     t0 = time.perf_counter()
-    model.fit(
-        X_train_scaled,
-        y_train,
-        epochs=epochs,
-        batch_size=batch_size,
-        tol=np.float32(1e-4),
-        n_iter_no_change=10,
-        verbose=False,
-    )
-
+    trainer.fit(dataloader, epochs=epochs, verbose=False)
+    t1 = time.perf_counter()
+    
     nn_pred_logits = model.predict(X_test_scaled)
     nn_preds = np.argmax(nn_pred_logits, axis=1)
     
     y_test_labels = np.argmax(y_test, axis=1)
-    t1 = time.perf_counter()
 
     nn_time = t1 - t0
     nn_acc = accuracy_score(y_test_labels, nn_preds) * 100
-    print(f"NNEngine (Adam) — Accuracy: {nn_acc:.2f}%  |  Time: {nn_time:.4f}s")
+    print(f"NNEngine (JIT)  — Accuracy: {nn_acc:.2f}%  |  Time: {nn_time:.4f}s")
 
+    
     sk_model = MLPClassifier(
         hidden_layer_sizes=(hidden_size,),
         activation="relu",
@@ -91,51 +95,23 @@ def test_dataset(name, X, y, epochs, lr, batch_size, hidden_size, seed, use_l2=T
 
     sk_time = t1 - t0
     sk_acc = accuracy_score(y_test_labels, sk_preds) * 100
-    print(f"Sklearn  (Adam) — Accuracy: {sk_acc:.2f}%  |  Time: {sk_time:.4f}s")
+    
+    print(f"Sklearn (Adam)  — Accuracy: {sk_acc:.2f}%  |  Time: {sk_time:.4f}s")
     print(f"Speedup: {sk_time / nn_time:.2f}x")
 
-
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Run NNEngine benchmark datasets.")
+    parser = argparse.ArgumentParser(description="Run NNEngine JIT benchmark datasets.")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
     args = parser.parse_args()
 
     iris = load_iris()
-    test_dataset(
-        "Iris Flower",
-        iris.data,
-        iris.target,
-        epochs=100,
-        lr=np.float32(0.01),
-        batch_size=16,
-        hidden_size=16,
-        seed=args.seed,
-    )
+    test_dataset("Iris Flower", iris.data, iris.target, epochs=100, lr=np.float32(0.01), batch_size=16, hidden_size=16, seed=args.seed)
 
     digits = load_digits()
-    test_dataset(
-        "Handwritten Digits",
-        digits.data,
-        digits.target,
-        epochs=50,
-        lr=np.float32(0.001),
-        batch_size=32,
-        hidden_size=128,
-        seed=args.seed + 1,
-    )
+    test_dataset("Handwritten Digits", digits.data, digits.target, epochs=50, lr=np.float32(0.001), batch_size=32, hidden_size=128, seed=args.seed + 1)
 
     faces = fetch_olivetti_faces()
-    test_dataset(
-        "Olivetti Faces",
-        faces.data,
-        faces.target,
-        epochs=50,
-        lr=np.float32(0.001),
-        batch_size=32,
-        hidden_size=128,
-        seed=args.seed + 2,
-    )
-
+    test_dataset("Olivetti Faces", faces.data, faces.target, epochs=50, lr=np.float32(0.001), batch_size=32, hidden_size=128, seed=args.seed + 2)
 
 if __name__ == "__main__":
     main()

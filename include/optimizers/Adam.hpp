@@ -1,0 +1,26 @@
+#pragma once
+
+#include <vector>
+
+#include "autograd/Tensor.hpp"
+#include "core/Optimizer.hpp"
+
+namespace mlengine::core {
+
+class Adam : public Optimizer {
+  std::vector<autograd::MatrixRM> m_;
+  std::vector<autograd::MatrixRM> v_;
+  int t_ = 0;
+  float beta1_ = 0.9f;
+  float beta2_ = 0.999f;
+  float epsilon_ = 1e-8f;
+
+ public:
+  explicit Adam(float learning_rate = 0.001f);
+
+  void set_parameters(const std::vector<autograd::Tensor*>& params) override;
+
+  void step() override;
+};
+
+}  // namespace mlengine::core

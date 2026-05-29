@@ -1,14 +1,10 @@
 #pragma once
 
 #include <vector>
-
 #include "autograd/Tensor.hpp"
 
 namespace mlengine::core {
 
-/**
- * @brief Base interface for regularizers.
- */
 class Regularizer {
  public:
   virtual ~Regularizer() = default;

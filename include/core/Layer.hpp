@@ -14,7 +14,7 @@ class Layer {
  public:
   virtual ~Layer() = default;
 
-  virtual autograd::Tensor* forward(autograd::Tape& tape,
+  virtual autograd::Tensor* forward(autograd::Tape* tape,
                                     autograd::Tensor* input) = 0;
 
   virtual std::vector<autograd::Tensor*> parameters() { return {}; }

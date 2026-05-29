@@ -1,5 +1,6 @@
 #pragma once
 #include <Eigen/Core>
+#include <utility>
 
 #include "core/Types.hpp"
 
@@ -27,6 +28,13 @@ struct Tensor {
     if (requires_grad) {
       grad = MatrixRM::Zero(data.rows(), data.cols());
     }
+  }
+
+  void update_data(const Eigen::Ref<const MatrixRM>& new_data) {
+    if (data.rows() != new_data.rows() || data.cols() != new_data.cols()) {
+      data.resize(new_data.rows(), new_data.cols());
+    }
+    data.noalias() = new_data;
   }
 
   void zero_grad() {
