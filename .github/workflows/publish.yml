@@ -30,13 +30,14 @@ jobs:
           CIBW_BEFORE_ALL_MACOS: brew install libomp ccache
           CIBW_BUILD_FRONTEND: pip
           CIBW_ENVIRONMENT_LINUX: >
-            PATH="$PATH:/usr/lib64/ccache:/usr/lib/ccache"
+            PATH="/usr/lib64/ccache:/usr/lib/ccache:$PATH"
             CMAKE_CXX_COMPILER_LAUNCHER=ccache
+            CMAKE_GENERATOR=Ninja
+            CCACHE_DIR=/home/runner/work/NNEngine/NNEngine/.ccache
           CIBW_ENVIRONMENT_MACOS: >
             PATH="$PATH:/usr/local/opt/ccache/libexec"
             CMAKE_CXX_COMPILER_LAUNCHER=ccache
-          CIBW_ENVIRONMENT_WINDOWS: >
-            CMAKE_CXX_COMPILER_LAUNCHER=ccache
+            CCACHE_DIR=/Users/runner/work/NNEngine/NNEngine/.ccache
 
       - uses: actions/upload-artifact@v4
         with:
