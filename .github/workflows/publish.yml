@@ -46,8 +46,6 @@ jobs:
             CMAKE_CXX_COMPILER_LAUNCHER=ccache
             CCACHE_DIR=${{ github.workspace }}/.ccache
             CCACHE_COMPILERCHECK=content
-          CIBW_ENVIRONMENT_WINDOWS: >
-            CMAKE_GENERATOR=Ninja
 
       - name: Fix cache permissions for Docker
         if: runner.os == 'Linux'
