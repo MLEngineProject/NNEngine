@@ -24,7 +24,7 @@ jobs:
           key: ${{ matrix.os }}
 
       - name: Build wheels
-        uses: pypa/cibuildwheel@v2
+        uses: pypa/cibuildwheel@v3.4.1
         env:
           CIBW_BEFORE_ALL_MACOS: brew install libomp
           CIBW_BUILD_FRONTEND: pip
