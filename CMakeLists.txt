@@ -7,6 +7,11 @@ endif()
 
 project(NN_ENGINE LANGUAGES CXX)
 
+if(SKBUILD_FREE_THREADED)
+    add_compile_definitions(Py_GIL_DISABLED=1)
+    message(STATUS "Free-threaded Python detected: defining Py_GIL_DISABLED=1")
+endif()
+
 find_program(CCACHE_PROGRAM ccache)
 if(CCACHE_PROGRAM)
     set(CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_PROGRAM}" CACHE STRING "Compiler launcher" FORCE)
@@ -53,7 +58,7 @@ else()
 
     FetchContent_Declare(
         pybind11
-        URL "https://github.com/pybind/pybind11/archive/refs/tags/v2.13.1.tar.gz"
+        URL "https://github.com/pybind/pybind11/archive/refs/tags/v2.13.6.tar.gz"
     )
     FetchContent_MakeAvailable(pybind11)
 
