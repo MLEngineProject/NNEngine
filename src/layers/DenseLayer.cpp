@@ -21,10 +21,10 @@ DenseLayer::DenseLayer(int input_dim, int output_dim)
   }
 }
 
-autograd::Tensor* DenseLayer::forward(autograd::Tape& tape,
+autograd::Tensor* DenseLayer::forward(autograd::Tape* tape,
                                       autograd::Tensor* input) {
-  auto* mm = tape.matmul(input, &weights_);
-  return tape.add_bias(mm, &bias_);
+  auto* mm = tape->matmul(input, &weights_);
+  return tape->add_bias(mm, &bias_);
 }
 
 std::vector<autograd::Tensor*> DenseLayer::parameters() {

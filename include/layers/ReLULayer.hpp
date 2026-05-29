@@ -5,9 +5,9 @@ namespace mlengine::layers {
 
 class ReLULayer : public core::Layer {
  public:
-  autograd::Tensor* forward(autograd::Tape& tape,
+  autograd::Tensor* forward(autograd::Tape* tape,
                             autograd::Tensor* input) override {
-    return tape.relu(input);
+    return tape->relu(input);
   }
 };
 

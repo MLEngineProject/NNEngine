@@ -1,14 +1,10 @@
 #pragma once
 
 #include <vector>
-
 #include "autograd/Tensor.hpp"
 
 namespace mlengine::core {
 
-/**
- * @brief Base interface for optimizers.
- */
 class Optimizer {
  protected:
   std::vector<autograd::Tensor*> parameters_;

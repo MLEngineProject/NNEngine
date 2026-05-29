@@ -5,9 +5,6 @@
 
 namespace mlengine::core {
 
-/**
- * @brief Base interface for loss functions.
- */
 class Loss {
  public:
   virtual ~Loss() = default;
