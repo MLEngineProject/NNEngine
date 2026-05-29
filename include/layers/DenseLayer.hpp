@@ -6,16 +6,44 @@
 
 namespace mlengine::layers {
 
+/**
+ * @brief Fully connected affine layer with learned weights and bias.
+ */
 class DenseLayer : public core::Layer {
  public:
+  /**
+   * @brief Create a dense layer with Glorot-style uniform initialization.
+   * @param input_dim Number of input features.
+   * @param output_dim Number of output features.
+   */
   DenseLayer(int input_dim, int output_dim);
 
+  /**
+   * @brief Apply the affine transform and record the corresponding tape ops.
+   * @param tape Autograd tape that owns the intermediate tensors.
+   * @param input Input activation tensor.
+   * @return Pointer to the tape-owned output tensor.
+   * @note The returned tensor is arena-allocated and owned by the tape, not
+   *     the caller.
+   */
   autograd::Tensor* forward(autograd::Tape* tape,
                             autograd::Tensor* input) override;
 
+  /**
+   * @brief Return the learned weight and bias tensors.
+   * @return Mutable parameter pointers for optimization.
+   */
   std::vector<autograd::Tensor*> parameters() override;
 
+  /**
+   * @brief Access the current weight matrix.
+   * @return Dense weight matrix.
+   */
   core::MatrixRM get_weights() const { return weights_.data; }
+  /**
+   * @brief Access the current bias row vector.
+   * @return Dense bias matrix.
+   */
   core::MatrixRM get_bias() const { return bias_.data; }
 
  private:

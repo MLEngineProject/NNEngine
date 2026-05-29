@@ -4,101 +4,42 @@
 #include <memory>
 #include <vector>
 
+#include "autograd/Op.hpp"
 #include "autograd/Tensor.hpp"
 
 namespace mlengine::autograd {
 
-enum class OpType { MatMul, AddBias, ReLU, LeakyReLU };
-
-struct OpNode {
-  OpType type;
-  Tensor *a, *b, *out;
-  float alpha;
-
-  void forward() {
-    switch (type) {
-      case OpType::MatMul:
-        if (out->data.rows() != a->data.rows()) {
-          out->data.resize(a->data.rows(), b->data.cols());
-          if (out->requires_grad) {
-            out->grad.resize(a->data.rows(), b->data.cols());
-            out->grad.setZero();
-          }
-        }
-        out->data.noalias() = a->data * b->data;
-        break;
-      case OpType::AddBias:
-        if (out->data.rows() != a->data.rows()) {
-          out->data.resize(a->data.rows(), a->data.cols());
-          if (out->requires_grad) {
-            out->grad.resize(a->data.rows(), a->data.cols());
-            out->grad.setZero();
-          }
-        }
-        out->data.noalias() = a->data.rowwise() + b->data.row(0);
-        break;
-      case OpType::ReLU:
-        if (out->data.rows() != a->data.rows()) {
-          out->data.resize(a->data.rows(), a->data.cols());
-          if (out->requires_grad) {
-            out->grad.resize(a->data.rows(), a->data.cols());
-            out->grad.setZero();
-          }
-        }
-        out->data.noalias() = a->data.cwiseMax(0.0f);
-        break;
-      case OpType::LeakyReLU:
-        if (out->data.rows() != a->data.rows()) {
-          out->data.resize(a->data.rows(), a->data.cols());
-          if (out->requires_grad) {
-            out->grad.resize(a->data.rows(), a->data.cols());
-            out->grad.setZero();
-          }
-        }
-        out->data.noalias() = a->data.unaryExpr(
-            [this](float x) { return x > 0.0f ? x : alpha * x; });
-        break;
-    }
-  }
-
-  void backward() {
-    switch (type) {
-      case OpType::MatMul:
-        if (a->requires_grad)
-          a->grad.noalias() += out->grad * b->data.transpose();
-        if (b->requires_grad)
-          b->grad.noalias() += a->data.transpose() * out->grad;
-        break;
-      case OpType::AddBias:
-        if (a->requires_grad) a->grad.noalias() += out->grad;
-        if (b->requires_grad) b->grad.noalias() += out->grad.colwise().sum();
-        break;
-      case OpType::ReLU:
-        if (a->requires_grad)
-          a->grad.array() +=
-              (a->data.array() > 0.0f).select(out->grad.array(), 0.0f);
-        break;
-      case OpType::LeakyReLU:
-        if (a->requires_grad)
-          a->grad.array() +=
-              (a->data.array() > 0.0f)
-                  .select(out->grad.array(), alpha * out->grad.array());
-        break;
-    }
-  }
-};
-
+/**
+ * @brief Arena-style storage and replay log for autograd tensors and ops.
+ *
+ * The tape owns all transient tensors it allocates. Callers receive raw
+ * pointers for convenience, but the lifetime is tied to the tape and must not
+ * be managed manually.
+ */
 class Tape {
  public:
   std::deque<Tensor> tensor_pool_;
   size_t tensor_idx_ = 0;
-  std::vector<OpNode> ops_;
+  std::vector<std::shared_ptr<Op>> ops_;
   bool record_ops_;
 
+  /**
+   * @brief Construct a tape that optionally records ops for replay.
+   * @param record_ops Whether ops should be stored for backward replay.
+   */
   explicit Tape(bool record_ops = true) : record_ops_(record_ops) {
     ops_.reserve(10000);
   }
 
+  /**
+   * @brief Allocate a tensor from the tape's arena.
+   * @param rows Number of rows.
+   * @param cols Number of columns.
+   * @param requires_grad Whether the tensor participates in autograd.
+   * @return Pointer to the tape-owned tensor.
+   * @note The returned tensor is arena-allocated and owned by the tape, not
+   *     the caller.
+   */
   Tensor* alloc_tensor(int rows, int cols, bool requires_grad = true) {
     bool req_grad_actual = record_ops_ && requires_grad;
     if (tensor_idx_ >= tensor_pool_.size()) {
@@ -121,6 +62,15 @@ class Tape {
     return &tensor_pool_[tensor_idx_++];
   }
 
+  /**
+   * @brief Materialize an Eigen expression into tape-owned storage.
+   * @tparam Derived Eigen expression type.
+   * @param expr Dense expression to copy into a tape tensor.
+   * @param requires_grad Whether the resulting tensor requires gradients.
+   * @return Pointer to the tape-owned tensor.
+   * @note The returned tensor is arena-allocated and owned by the tape, not
+   *     the caller.
+   */
   template <typename Derived>
   Tensor* push_expr(const Eigen::MatrixBase<Derived>& expr,
                     bool requires_grad = true) {
@@ -129,59 +79,56 @@ class Tape {
     return t;
   }
 
+  /**
+   * @brief Copy a dense matrix into tape-owned storage.
+   * @param data Matrix value to push.
+   * @param requires_grad Whether the resulting tensor requires gradients.
+   * @return Pointer to the tape-owned tensor.
+   * @note The returned tensor is arena-allocated and owned by the tape, not
+   *     the caller.
+   */
   Tensor* push_tensor(const mlengine::MatrixRM& data,
                       bool requires_grad = true) {
     return push_expr(data, requires_grad);
   }
 
-  Tensor* matmul(Tensor* a, Tensor* b) {
-    bool req_grad = record_ops_ && (a->requires_grad || b->requires_grad);
-    Tensor* out = alloc_tensor(a->data.rows(), b->data.cols(), req_grad);
-    out->data.noalias() = a->data * b->data;
-    if (record_ops_) ops_.push_back({OpType::MatMul, a, b, out, 0.0f});
-    return out;
+  /**
+   * @brief Record an op for future replay if recording is enabled.
+   * @param op Differentiable primitive to append to the tape.
+   */
+  void record_op(std::shared_ptr<Op> op) {
+    if (record_ops_) ops_.push_back(op);
   }
 
-  Tensor* add_bias(Tensor* a, Tensor* b) {
-    bool req_grad = record_ops_ && (a->requires_grad || b->requires_grad);
-    Tensor* out = alloc_tensor(a->data.rows(), a->data.cols(), req_grad);
-    out->data.noalias() = a->data.rowwise() + b->data.row(0);
-    if (record_ops_) ops_.push_back({OpType::AddBias, a, b, out, 0.0f});
-    return out;
-  }
-
-  Tensor* relu(Tensor* a) {
-    bool req_grad = record_ops_ && a->requires_grad;
-    Tensor* out = alloc_tensor(a->data.rows(), a->data.cols(), req_grad);
-    out->data.noalias() = a->data.cwiseMax(0.0f);
-    if (record_ops_) ops_.push_back({OpType::ReLU, a, nullptr, out, 0.0f});
-    return out;
-  }
-
-  Tensor* leaky_relu(Tensor* a, float alpha) {
-    bool req_grad = record_ops_ && a->requires_grad;
-    Tensor* out = alloc_tensor(a->data.rows(), a->data.cols(), req_grad);
-    out->data.noalias() = a->data.unaryExpr(
-        [alpha](float x) { return x > 0.0f ? x : alpha * x; });
-    if (record_ops_)
-      ops_.push_back({OpType::LeakyReLU, a, nullptr, out, alpha});
-    return out;
-  }
-
+  /**
+   * @brief Re-run all recorded forward ops in insertion order.
+   */
   void replay_forward() {
-    for (auto& op : ops_) op.forward();
+    for (auto& op : ops_) op->forward();
   }
 
+  /**
+   * @brief Re-run all recorded backward ops in reverse order.
+   */
   void replay_backward() {
-    for (auto it = ops_.rbegin(); it != ops_.rend(); ++it) it->backward();
+    for (auto it = ops_.rbegin(); it != ops_.rend(); ++it) (*it)->backward();
   }
 
+  /**
+   * @brief Zero every gradient buffer stored in the tape arena.
+   */
   void zero_grads() {
     for (auto& t : tensor_pool_) t.zero_grad();
   }
 
+  /**
+   * @brief Alias for replaying the backward pass.
+   */
   void backward() { replay_backward(); }
 
+  /**
+   * @brief Clear the recorded graph and rewind arena allocation.
+   */
   void reset() {
     ops_.clear();
     tensor_idx_ = 0;

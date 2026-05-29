@@ -4,7 +4,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "nn-engine-core"
-version = "0.1.2"
+version = "0.1.3"
 description = "A high-performance C++ parametric optimization backend for NNEngine"
 readme = "README.md"
 license = {text = "MIT"}
@@ -12,6 +12,24 @@ requires-python = ">=3.8"
 dependencies = [
     "numpy"
 ]
+keywords = ["machine-learning", "neural-networks", "autograd", "c++", "eigen"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: C++",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence"
+]
+
+[project.urls]
+Homepage = "https://github.com/MLEngineProject/NNEngine"
 
 [tool.scikit-build]
 cmake.version = ">=3.18"

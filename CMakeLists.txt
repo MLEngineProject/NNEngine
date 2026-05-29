@@ -68,6 +68,10 @@ endif()
 
 pybind11_add_module(nn_core NO_EXTRAS
     src/binding.cpp 
+    src/autograd/ops/MatMulOp.cpp
+    src/autograd/ops/AddBiasOp.cpp
+    src/autograd/ops/ReLUOp.cpp
+    src/autograd/ops/LeakyReLUOp.cpp
     src/layers/DenseLayer.cpp
     src/losses/MSELoss.cpp
     src/losses/SoftmaxCrossEntropyLoss.cpp
