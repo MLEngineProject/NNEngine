@@ -16,11 +16,19 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+      
+      - name: Setup ccache
+        if: runner.os != 'Windows'
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: ${{ matrix.os }}
 
       - name: Build wheels
-        uses: pypa/cibuildwheel@v2.17.0
+        uses: pypa/cibuildwheel@v2
         env:
           CIBW_BEFORE_ALL_MACOS: brew install libomp
+          CIBW_BUILD_FRONTEND: pip
+          CIBW_ENVIRONMENT: 'PATH="$PATH:/usr/lib/ccache:/usr/lib64/ccache"'
 
       - uses: actions/upload-artifact@v4
         with:
@@ -32,10 +40,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - name: Build sdist
         run: pipx run build --sdist
-
       - uses: actions/upload-artifact@v4
         with:
           name: cibw-sdist
