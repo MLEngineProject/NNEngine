@@ -38,4 +38,4 @@ build-dir = "build/{wheel_tag}"
 wheel.packages = ["nnengine"]
 
 [tool.cibuildwheel]
-skip = "*-musllinux_* *-win32 *i686"
+skip = "*-musllinux_* *-win32 *i686 cp*t-win*"
